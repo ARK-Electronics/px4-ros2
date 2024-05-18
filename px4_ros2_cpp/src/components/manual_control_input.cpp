@@ -9,25 +9,25 @@
 namespace px4_ros2
 {
 
-ManualControlInput::ManualControlInput(Context & context, bool is_optional)
-: _node(context.node())
+ManualControlInput::ManualControlInput(Context& context, bool is_optional)
+	: _node(context.node())
 {
-  _manual_control_setpoint.set__valid(false);
+	_manual_control_setpoint.set__valid(false);
 
-  _manual_control_setpoint_sub =
-    context.node().create_subscription<px4_msgs::msg::ManualControlSetpoint>(
-    context.topicNamespacePrefix() + "/fmu/out/manual_control_setpoint", rclcpp::QoS(
-      1).best_effort(),
-    [this](px4_msgs::msg::ManualControlSetpoint::UniquePtr msg) {
-      _manual_control_setpoint = *msg;
-      _last_manual_control_setpoint = _node.get_clock()->now();
-    });
+	_manual_control_setpoint_sub =
+		context.node().create_subscription<px4_msgs::msg::ManualControlSetpoint>(
+			context.topicNamespacePrefix() + "/fmu/out/manual_control_setpoint", rclcpp::QoS(
+				1).best_effort(),
+	[this](px4_msgs::msg::ManualControlSetpoint::UniquePtr msg) {
+		_manual_control_setpoint = *msg;
+		_last_manual_control_setpoint = _node.get_clock()->now();
+	});
 
-  if (!is_optional) {
-    RequirementFlags requirements{};
-    requirements.manual_control = true;
-    context.setRequirement(requirements);
-  }
+	if (!is_optional) {
+		RequirementFlags requirements{};
+		requirements.manual_control = true;
+		context.setRequirement(requirements);
+	}
 }
 
 } // namespace px4_ros2

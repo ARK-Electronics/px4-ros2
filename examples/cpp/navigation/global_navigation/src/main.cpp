@@ -8,10 +8,10 @@
 #include <global_navigation.hpp>
 
 
-int main(int argc, char * argv[])
+int main(int argc, char* argv[])
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<ExampleGlobalNavigationNode>());
-  rclcpp::shutdown();
-  return 0;
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<ExampleGlobalNavigationNode>());
+	rclcpp::shutdown();
+	return 0;
 }

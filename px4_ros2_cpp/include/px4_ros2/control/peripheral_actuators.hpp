@@ -25,27 +25,27 @@ namespace px4_ros2
 class PeripheralActuatorControls
 {
 public:
-  static constexpr int kNumActuators = 6;
+	static constexpr int kNumActuators = 6;
 
-  explicit PeripheralActuatorControls(Context & context);
+	explicit PeripheralActuatorControls(Context& context);
 
-  /**
-   * Control actuators
-   * @param values range [-1, 1], NAN=ignore value
-   */
-  void set(const Eigen::Matrix<float, kNumActuators, 1> & values);
+	/**
+	 * Control actuators
+	 * @param values range [-1, 1], NAN=ignore value
+	 */
+	void set(const Eigen::Matrix<float, kNumActuators, 1>& values);
 
-  /**
-   * Sets a single actuator output
-   * @param value range [-1, 1]
-   * @param index range [0, kNumActuators)
-   */
-  void set(float value, unsigned index = 0);
+	/**
+	 * Sets a single actuator output
+	 * @param value range [-1, 1]
+	 * @param index range [0, kNumActuators)
+	 */
+	void set(float value, unsigned index = 0);
 
 private:
-  rclcpp::Node & _node;
-  rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr _vehicle_command_pub;
-  rclcpp::Time _last_update{};
+	rclcpp::Node& _node;
+	rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr _vehicle_command_pub;
+	rclcpp::Time _last_update{};
 };
 
 /** @}*/

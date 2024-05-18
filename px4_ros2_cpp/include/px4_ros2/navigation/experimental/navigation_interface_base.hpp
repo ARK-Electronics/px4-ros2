@@ -16,8 +16,8 @@ namespace px4_ros2
 class NavigationInterfaceInvalidArgument : public std::invalid_argument
 {
 public:
-  explicit NavigationInterfaceInvalidArgument(const std::string & message)
-  : std::invalid_argument("PX4 ROS2 navigation interface: invalid argument: " + message) {}
+	explicit NavigationInterfaceInvalidArgument(const std::string& message)
+		: std::invalid_argument("PX4 ROS2 navigation interface: invalid argument: " + message) {}
 };
 
 /**
@@ -26,23 +26,23 @@ public:
 class PositionMeasurementInterfaceBase : public Context
 {
 public:
-  explicit PositionMeasurementInterfaceBase(
-    rclcpp::Node & node,
-    std::string topic_namespace_prefix = "")
-  : Context(node, std::move(topic_namespace_prefix)), _node(node) {}
-  virtual ~PositionMeasurementInterfaceBase() = default;
+	explicit PositionMeasurementInterfaceBase(
+		rclcpp::Node& node,
+		std::string topic_namespace_prefix = "")
+		: Context(node, std::move(topic_namespace_prefix)), _node(node) {}
+	virtual ~PositionMeasurementInterfaceBase() = default;
 
-  /**
-   * Register the interface.
-   * @return true on success
-   */
-  bool doRegister()
-  {
-    return true;
-  }
+	/**
+	 * Register the interface.
+	 * @return true on success
+	 */
+	bool doRegister()
+	{
+		return true;
+	}
 
 protected:
-  rclcpp::Node & _node;
+	rclcpp::Node& _node;
 };
 
 } // namespace px4_ros2

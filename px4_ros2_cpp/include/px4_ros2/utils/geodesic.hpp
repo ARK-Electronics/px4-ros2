@@ -46,67 +46,67 @@ class MapProjectionImpl;
 class MapProjection
 {
 public:
-  explicit MapProjection(Context & context);
+	explicit MapProjection(Context& context);
 
-  ~MapProjection();
+	~MapProjection();
 
-  /**
-   * @return true, if the map reference has been initialized before
-   */
-  bool isInitialized() const;
+	/**
+	 * @return true, if the map reference has been initialized before
+	 */
+	bool isInitialized() const;
 
-  /**
-   * @brief Transform a point in the geographic coordinate system to the local
-   * azimuthal equidistant plane using the projection
-   *
-   * @param global_position lat [deg], lon [deg]
-   * @return the point in local coordinates as north, east [m]
-   */
-  Eigen::Vector2f globalToLocal(const Eigen::Vector2d & global_position) const;
+	/**
+	 * @brief Transform a point in the geographic coordinate system to the local
+	 * azimuthal equidistant plane using the projection
+	 *
+	 * @param global_position lat [deg], lon [deg]
+	 * @return the point in local coordinates as north, east [m]
+	 */
+	Eigen::Vector2f globalToLocal(const Eigen::Vector2d& global_position) const;
 
-  /**
-   * @brief Transform a point in the geographic coordinate system to the local
-   * azimuthal equidistant plane using the projection
-   *
-   * @param global_position lat [deg], lon [deg], alt AMSL [m]
-   * @return the point in local coordinates as north, east, down [m]
-   */
-  Eigen::Vector3f globalToLocal(const Eigen::Vector3d & global_position) const;
+	/**
+	 * @brief Transform a point in the geographic coordinate system to the local
+	 * azimuthal equidistant plane using the projection
+	 *
+	 * @param global_position lat [deg], lon [deg], alt AMSL [m]
+	 * @return the point in local coordinates as north, east, down [m]
+	 */
+	Eigen::Vector3f globalToLocal(const Eigen::Vector3d& global_position) const;
 
-  /**
-   * @brief Transform a point in the local azimuthal equidistant plane to the
-   * geographic coordinate system using the projection
-   *
-   * @param local_position north, east [m]
-   * @return the point in geographic coordinates as lat [deg], lon [deg]
-   */
-  Eigen::Vector2d localToGlobal(const Eigen::Vector2f & local_position) const;
+	/**
+	 * @brief Transform a point in the local azimuthal equidistant plane to the
+	 * geographic coordinate system using the projection
+	 *
+	 * @param local_position north, east [m]
+	 * @return the point in geographic coordinates as lat [deg], lon [deg]
+	 */
+	Eigen::Vector2d localToGlobal(const Eigen::Vector2f& local_position) const;
 
-  /**
-   * @brief Transform a point in the local azimuthal equidistant plane to the
-   * geographic coordinate system using the projection
-   *
-   * @param local_position north, east, down [m]
-   * @return the point in geographic coordinates as lat [deg], lon [deg], alt AMSL [m]
-   */
-  Eigen::Vector3d localToGlobal(const Eigen::Vector3f & local_position) const;
+	/**
+	 * @brief Transform a point in the local azimuthal equidistant plane to the
+	 * geographic coordinate system using the projection
+	 *
+	 * @param local_position north, east, down [m]
+	 * @return the point in geographic coordinates as lat [deg], lon [deg], alt AMSL [m]
+	 */
+	Eigen::Vector3d localToGlobal(const Eigen::Vector3f& local_position) const;
 
 private:
-  /**
-   * @throw runtime error if class instance is not initalized
-   */
-  void assertInitalized() const;
+	/**
+	 * @throw runtime error if class instance is not initalized
+	 */
+	void assertInitalized() const;
 
-  /**
-   * @brief Callback for VehicleLocalPosition messages which intializes and updates the map projection reference point from PX4
-   *
-   * @param msg the VehicleLocalPosition message
-  */
-  void vehicleLocalPositionCallback(px4_msgs::msg::VehicleLocalPosition::UniquePtr msg);
+	/**
+	 * @brief Callback for VehicleLocalPosition messages which intializes and updates the map projection reference point from PX4
+	 *
+	 * @param msg the VehicleLocalPosition message
+	*/
+	void vehicleLocalPositionCallback(px4_msgs::msg::VehicleLocalPosition::UniquePtr msg);
 
-  rclcpp::Node & _node;
-  std::unique_ptr<MapProjectionImpl> _map_projection_math;
-  rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr _vehicle_local_position_sub;
+	rclcpp::Node& _node;
+	std::unique_ptr<MapProjectionImpl> _map_projection_math;
+	rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr _vehicle_local_position_sub;
 };
 
 /**
@@ -119,8 +119,8 @@ private:
  * @ingroup geodesic
  */
 float horizontalDistanceToGlobalPosition(
-  const Eigen::Vector2d & global_position_now,
-  const Eigen::Vector2d & global_position_next);
+	const Eigen::Vector2d& global_position_now,
+	const Eigen::Vector2d& global_position_next);
 
 /**
  * @brief Compute the horizontal distance between two global positions in meters.
@@ -132,12 +132,12 @@ float horizontalDistanceToGlobalPosition(
  * @ingroup geodesic
  */
 static inline float horizontalDistanceToGlobalPosition(
-  const Eigen::Vector3d & global_position_now,
-  const Eigen::Vector3d & global_position_next)
+	const Eigen::Vector3d& global_position_now,
+	const Eigen::Vector3d& global_position_next)
 {
-  return horizontalDistanceToGlobalPosition(
-    static_cast<Eigen::Vector2d>(global_position_now.head(2)),
-    static_cast<Eigen::Vector2d>(global_position_next.head(2)));
+	return horizontalDistanceToGlobalPosition(
+		       static_cast<Eigen::Vector2d>(global_position_now.head(2)),
+		       static_cast<Eigen::Vector2d>(global_position_next.head(2)));
 }
 
 /**
@@ -150,8 +150,8 @@ static inline float horizontalDistanceToGlobalPosition(
  * @ingroup geodesic
  */
 float distanceToGlobalPosition(
-  const Eigen::Vector3d & global_position_now,
-  const Eigen::Vector3d & global_position_next);
+	const Eigen::Vector3d& global_position_now,
+	const Eigen::Vector3d& global_position_next);
 
 /**
  * @brief Compute the heading to the next global position in radians.
@@ -163,8 +163,8 @@ float distanceToGlobalPosition(
  * @ingroup geodesic
 */
 float headingToGlobalPosition(
-  const Eigen::Vector2d & global_position_now,
-  const Eigen::Vector2d & global_position_next);
+	const Eigen::Vector2d& global_position_now,
+	const Eigen::Vector2d& global_position_next);
 
 /**
  * @brief Compute the heading to the next global position in radians.
@@ -176,12 +176,12 @@ float headingToGlobalPosition(
  * @ingroup geodesic
 */
 static inline float headingToGlobalPosition(
-  const Eigen::Vector3d & global_position_now,
-  const Eigen::Vector3d & global_position_next)
+	const Eigen::Vector3d& global_position_now,
+	const Eigen::Vector3d& global_position_next)
 {
-  return headingToGlobalPosition(
-    static_cast<Eigen::Vector2d>(global_position_now.head(2)),
-    static_cast<Eigen::Vector2d>(global_position_next.head(2)));
+	return headingToGlobalPosition(
+		       static_cast<Eigen::Vector2d>(global_position_now.head(2)),
+		       static_cast<Eigen::Vector2d>(global_position_next.head(2)));
 }
 
 /**
@@ -194,8 +194,8 @@ static inline float headingToGlobalPosition(
  * @ingroup geodesic
 */
 Eigen::Vector2f vectorToGlobalPosition(
-  const Eigen::Vector2d & global_position_now,
-  const Eigen::Vector2d & global_position_next);
+	const Eigen::Vector2d& global_position_now,
+	const Eigen::Vector2d& global_position_next);
 
 /**
  * @brief Compute the vector to the next global position in meters.
@@ -207,15 +207,15 @@ Eigen::Vector2f vectorToGlobalPosition(
  * @ingroup geodesic
 */
 static inline Eigen::Vector3f vectorToGlobalPosition(
-  const Eigen::Vector3d & global_position_now,
-  const Eigen::Vector3d & global_position_next)
+	const Eigen::Vector3d& global_position_now,
+	const Eigen::Vector3d& global_position_next)
 {
-  const Eigen::Vector2f vector_res =
-    vectorToGlobalPosition(
-    static_cast<Eigen::Vector2d>(global_position_now.head(2)),
-    static_cast<Eigen::Vector2d>(global_position_next.head(2)));
-  const double d_alt = -(global_position_next.z() - global_position_now.z());
-  return Eigen::Vector3f {vector_res.x(), vector_res.y(), static_cast<float>(d_alt)};
+	const Eigen::Vector2f vector_res =
+		vectorToGlobalPosition(
+			static_cast<Eigen::Vector2d>(global_position_now.head(2)),
+			static_cast<Eigen::Vector2d>(global_position_next.head(2)));
+	const double d_alt = -(global_position_next.z() - global_position_now.z());
+	return Eigen::Vector3f {vector_res.x(), vector_res.y(), static_cast<float>(d_alt)};
 }
 
 /**
@@ -229,9 +229,9 @@ static inline Eigen::Vector3f vectorToGlobalPosition(
  * @ingroup geodesic
  */
 Eigen::Vector2d globalPositionFromLineAndDist(
-  const Eigen::Vector2d & global_position_line_start,
-  const Eigen::Vector2d & global_position_line_end,
-  float dist_from_start);
+	const Eigen::Vector2d& global_position_line_start,
+	const Eigen::Vector2d& global_position_line_end,
+	float dist_from_start);
 
 /**
  * @brief Compute the global position given another global position, distance and heading
@@ -245,8 +245,8 @@ Eigen::Vector2d globalPositionFromLineAndDist(
  * @ingroup geodesic
  */
 Eigen::Vector2d globalPositionFromHeadingAndDist(
-  const Eigen::Vector2d & global_position_now,
-  float heading, float dist);
+	const Eigen::Vector2d& global_position_now,
+	float heading, float dist);
 
 /**
  * @brief Compute the global position given another global position, distance and heading
@@ -260,15 +260,15 @@ Eigen::Vector2d globalPositionFromHeadingAndDist(
  * @ingroup geodesic
  */
 static inline Eigen::Vector3d globalPositionFromHeadingAndDist(
-  const Eigen::Vector3d & global_position_now,
-  float heading, float dist)
+	const Eigen::Vector3d& global_position_now,
+	float heading, float dist)
 {
-  const Eigen::Vector2d global_position_res = globalPositionFromHeadingAndDist(
-    static_cast<Eigen::Vector2d>(global_position_now.head(2)), heading, dist);
-  return Eigen::Vector3d {
-    global_position_res.x(),
-    global_position_res.y(),
-    global_position_now.z()};
+	const Eigen::Vector2d global_position_res = globalPositionFromHeadingAndDist(
+				static_cast<Eigen::Vector2d>(global_position_now.head(2)), heading, dist);
+	return Eigen::Vector3d {
+		global_position_res.x(),
+		global_position_res.y(),
+		global_position_now.z()};
 }
 
 /**
@@ -281,8 +281,8 @@ static inline Eigen::Vector3d globalPositionFromHeadingAndDist(
  * @ingroup geodesic
 */
 Eigen::Vector2d addVectorToGlobalPosition(
-  const Eigen::Vector2d & global_position,
-  const Eigen::Vector2f & vector_ne);
+	const Eigen::Vector2d& global_position,
+	const Eigen::Vector2f& vector_ne);
 
 /**
  * @brief Compute the global position from adding a local frame vector to the current global position.
@@ -294,15 +294,15 @@ Eigen::Vector2d addVectorToGlobalPosition(
  * @ingroup geodesic
 */
 static inline Eigen::Vector3d addVectorToGlobalPosition(
-  const Eigen::Vector3d & global_position,
-  const Eigen::Vector3f & vector_ned)
+	const Eigen::Vector3d& global_position,
+	const Eigen::Vector3f& vector_ned)
 {
-  const Eigen::Vector2d global_position_res = addVectorToGlobalPosition(
-    static_cast<Eigen::Vector2d>(global_position.head(2)),
-    static_cast<Eigen::Vector2f>(vector_ned.head(2)));
-  const double d_alt = -vector_ned.z();
-  return Eigen::Vector3d {global_position_res.x(), global_position_res.y(),
-    global_position.z() + d_alt};
+	const Eigen::Vector2d global_position_res = addVectorToGlobalPosition(
+				static_cast<Eigen::Vector2d>(global_position.head(2)),
+				static_cast<Eigen::Vector2f>(vector_ned.head(2)));
+	const double d_alt = -vector_ned.z();
+	return Eigen::Vector3d {global_position_res.x(), global_position_res.y(),
+				global_position.z() + d_alt};
 }
 
 /** @}*/

@@ -24,21 +24,21 @@ namespace px4_ros2
 class TrajectorySetpointType : public SetpointBase
 {
 public:
-  explicit TrajectorySetpointType(Context & context);
+	explicit TrajectorySetpointType(Context& context);
 
-  ~TrajectorySetpointType() override = default;
+	~TrajectorySetpointType() override = default;
 
-  Configuration getConfiguration() override;
+	Configuration getConfiguration() override;
 
-  void update(
-    const Eigen::Vector3f & velocity_ned_m_s,
-    const std::optional<Eigen::Vector3f> & acceleration_ned_m_s2 = {},
-    std::optional<float> yaw_ned_rad = {},
-    std::optional<float> yaw_rate_ned_rad_s = {});
+	void update(
+		const Eigen::Vector3f& velocity_ned_m_s,
+		const std::optional<Eigen::Vector3f>& acceleration_ned_m_s2 = {},
+		std::optional<float> yaw_ned_rad = {},
+		std::optional<float> yaw_rate_ned_rad_s = {});
 
 private:
-  rclcpp::Node & _node;
-  rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr _trajectory_setpoint_pub;
+	rclcpp::Node& _node;
+	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr _trajectory_setpoint_pub;
 };
 
 /** @}*/

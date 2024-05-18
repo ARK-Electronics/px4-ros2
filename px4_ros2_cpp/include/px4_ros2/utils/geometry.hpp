@@ -38,7 +38,7 @@ namespace px4_ros2
 template<typename Type>
 Type radToDeg(Type rad)
 {
-  return rad * static_cast<Type>(180.0 / M_PI);
+	return rad * static_cast<Type>(180.0 / M_PI);
 }
 
 /**
@@ -47,18 +47,18 @@ Type radToDeg(Type rad)
 template<typename Type>
 Type degToRad(Type deg)
 {
-  return deg * static_cast<Type>(M_PI / 180.0);
+	return deg * static_cast<Type>(M_PI / 180.0);
 }
 
 namespace literals
 {
 static inline constexpr float operator"" _deg(long double degrees)
 {
-  return static_cast<float>(degrees * M_PI / 180.0);
+	return static_cast<float>(degrees * M_PI / 180.0);
 }
 static inline constexpr float operator"" _rad(long double radians)
 {
-  return static_cast<float>(radians);
+	return static_cast<float>(radians);
 }
 }
 
@@ -71,13 +71,15 @@ static inline constexpr float operator"" _rad(long double radians)
 template<typename Type>
 Type wrapPi(Type angle)
 {
-  while (angle >= M_PI) {
-    angle -= 2.0 * M_PI;
-  }
-  while (angle < -M_PI) {
-    angle += 2.0 * M_PI;
-  }
-  return angle;
+	while (angle >= M_PI) {
+		angle -= 2.0 * M_PI;
+	}
+
+	while (angle < -M_PI) {
+		angle += 2.0 * M_PI;
+	}
+
+	return angle;
 }
 
 /**
@@ -88,25 +90,27 @@ Type wrapPi(Type angle)
  * @return Euler angles corresponding to the given quaternion in range R, P, Y = [-pi, pi], [-pi/2, pi/2], [-pi, pi].
  */
 template<typename Type>
-Eigen::Matrix<Type, 3, 1> quaternionToEulerRpy(const Eigen::Quaternion<Type> & q)
+Eigen::Matrix<Type, 3, 1> quaternionToEulerRpy(const Eigen::Quaternion<Type>& q)
 {
-  Eigen::Matrix<Type, 3, 1> angles;
-  Eigen::Matrix<Type, 3, 3> dcm = q.toRotationMatrix();
+	Eigen::Matrix<Type, 3, 1> angles;
+	Eigen::Matrix<Type, 3, 3> dcm = q.toRotationMatrix();
 
-  angles.y() = asin(-dcm.coeff(2, 0));
+	angles.y() = asin(-dcm.coeff(2, 0));
 
-  if ((std::fabs(angles.y() - static_cast<Type>(M_PI / 2))) < static_cast<Type>(1.0e-3)) {
-    angles.x() = 0;
-    angles.z() = atan2(dcm.coeff(1, 2), dcm.coeff(0, 2));
-  } else if ((std::fabs(angles.y() + static_cast<Type>(M_PI / 2))) < static_cast<Type>(1.0e-3)) {
-    angles.x() = 0;
-    angles.z() = atan2(-dcm.coeff(1, 2), -dcm.coeff(0, 2));
-  } else {
-    angles.x() = atan2(dcm.coeff(2, 1), dcm.coeff(2, 2));
-    angles.z() = atan2(dcm.coeff(1, 0), dcm.coeff(0, 0));
-  }
+	if ((std::fabs(angles.y() - static_cast<Type>(M_PI / 2))) < static_cast<Type>(1.0e-3)) {
+		angles.x() = 0;
+		angles.z() = atan2(dcm.coeff(1, 2), dcm.coeff(0, 2));
 
-  return angles;
+	} else if ((std::fabs(angles.y() + static_cast<Type>(M_PI / 2))) < static_cast<Type>(1.0e-3)) {
+		angles.x() = 0;
+		angles.z() = atan2(-dcm.coeff(1, 2), -dcm.coeff(0, 2));
+
+	} else {
+		angles.x() = atan2(dcm.coeff(2, 1), dcm.coeff(2, 2));
+		angles.z() = atan2(dcm.coeff(1, 0), dcm.coeff(0, 0));
+	}
+
+	return angles;
 }
 
 /**
@@ -116,12 +120,12 @@ Eigen::Matrix<Type, 3, 1> quaternionToEulerRpy(const Eigen::Quaternion<Type> & q
  * @return Quaternion corresponding to the given euler angles.
  */
 template<typename Type>
-Eigen::Quaternion<Type> eulerRpyToQuaternion(const Eigen::Matrix<Type, 3, 1> & euler)
+Eigen::Quaternion<Type> eulerRpyToQuaternion(const Eigen::Matrix<Type, 3, 1>& euler)
 {
-  return Eigen::Quaternion<Type>(
-    Eigen::AngleAxis<Type>(euler[2], Eigen::Matrix<Type, 3, 1>::UnitZ()) *
-    Eigen::AngleAxis<Type>(euler[1], Eigen::Matrix<Type, 3, 1>::UnitY()) *
-    Eigen::AngleAxis<Type>(euler[0], Eigen::Matrix<Type, 3, 1>::UnitX()));
+	return Eigen::Quaternion<Type>(
+		       Eigen::AngleAxis<Type>(euler[2], Eigen::Matrix<Type, 3, 1>::UnitZ()) *
+		       Eigen::AngleAxis<Type>(euler[1], Eigen::Matrix<Type, 3, 1>::UnitY()) *
+		       Eigen::AngleAxis<Type>(euler[0], Eigen::Matrix<Type, 3, 1>::UnitX()));
 }
 
 /**
@@ -135,7 +139,7 @@ Eigen::Quaternion<Type> eulerRpyToQuaternion(const Eigen::Matrix<Type, 3, 1> & e
 template<typename Type>
 Eigen::Quaternion<Type> eulerRpyToQuaternion(const Type roll, const Type pitch, const Type yaw)
 {
-  return eulerRpyToQuaternion(Eigen::Matrix<Type, 3, 1>{roll, pitch, yaw});
+	return eulerRpyToQuaternion(Eigen::Matrix<Type, 3, 1> {roll, pitch, yaw});
 }
 
 /**
@@ -145,14 +149,14 @@ Eigen::Quaternion<Type> eulerRpyToQuaternion(const Type roll, const Type pitch, 
  * @return Roll angle corresponding to the given quaternion in range [-pi, pi]
 */
 template<typename Type>
-Type quaternionToRoll(const Eigen::Quaternion<Type> & q)
+Type quaternionToRoll(const Eigen::Quaternion<Type>& q)
 {
-  Type x = q.x();
-  Type y = q.y();
-  Type z = q.z();
-  Type w = q.w();
+	Type x = q.x();
+	Type y = q.y();
+	Type z = q.z();
+	Type w = q.w();
 
-  return std::atan2(2.0 * (w * x + y * z), w * w - x * x - y * y + z * z);
+	return std::atan2(2.0 * (w * x + y * z), w * w - x * x - y * y + z * z);
 }
 
 /**
@@ -162,14 +166,14 @@ Type quaternionToRoll(const Eigen::Quaternion<Type> & q)
  * @return Pitch angle corresponding to the given quaternion in range [-pi, pi]
 */
 template<typename Type>
-Type quaternionToPitch(const Eigen::Quaternion<Type> & q)
+Type quaternionToPitch(const Eigen::Quaternion<Type>& q)
 {
-  Type x = q.x();
-  Type y = q.y();
-  Type z = q.z();
-  Type w = q.w();
+	Type x = q.x();
+	Type y = q.y();
+	Type z = q.z();
+	Type w = q.w();
 
-  return std::atan2(2.0 * (w * y - z * x), 1.0 - 2.0 * (x * x + y * y));
+	return std::atan2(2.0 * (w * y - z * x), 1.0 - 2.0 * (x * x + y * y));
 }
 
 /**
@@ -179,14 +183,14 @@ Type quaternionToPitch(const Eigen::Quaternion<Type> & q)
  * @return Yaw angle corresponding to the given quaternion in range [-pi, pi]
 */
 template<typename Type>
-Type quaternionToYaw(const Eigen::Quaternion<Type> & q)
+Type quaternionToYaw(const Eigen::Quaternion<Type>& q)
 {
-  Type x = q.x();
-  Type y = q.y();
-  Type z = q.z();
-  Type w = q.w();
+	Type x = q.x();
+	Type y = q.y();
+	Type z = q.z();
+	Type w = q.w();
 
-  return std::atan2(2.0 * (x * y + w * z), w * w + x * x - y * y - z * z);
+	return std::atan2(2.0 * (x * y + w * z), w * w + x * x - y * y - z * z);
 }
 
 /** @}*/

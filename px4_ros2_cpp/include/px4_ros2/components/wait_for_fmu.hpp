@@ -19,8 +19,8 @@ namespace px4_ros2
  * @return true on success
  */
 bool waitForFMU(
-  rclcpp::Node & node, const rclcpp::Duration & timeout = 30s,
-  const std::string & topic_namespace_prefix = "");
+	rclcpp::Node& node, const rclcpp::Duration& timeout = 30s,
+	const std::string& topic_namespace_prefix = "");
 
 /** @}*/
 } // namespace px4_ros2

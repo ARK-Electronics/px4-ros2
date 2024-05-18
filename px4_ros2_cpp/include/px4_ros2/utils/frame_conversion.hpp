@@ -28,13 +28,13 @@ namespace px4_ros2
  * @return Attitude quaternion in ENU frame.
  */
 template<typename Type>
-Eigen::Quaternion<Type> attitudeNedToEnu(const Eigen::Quaternion<Type> & q_ned)
+Eigen::Quaternion<Type> attitudeNedToEnu(const Eigen::Quaternion<Type>& q_ned)
 {
-  static constexpr Type kHalfSqrt2 = static_cast<Type>(0.7071067811865476);
-  const Eigen::Quaternion<Type> q_ned_to_enu {0.0, kHalfSqrt2, kHalfSqrt2, 0.0};  // 180 deg along X, -90 deg along Z (intrinsic)
-  const Eigen::Quaternion<Type> q_yaw_minus_pi_2{kHalfSqrt2, 0.0, 0.0, -kHalfSqrt2};  // -90 deg along Z
+	static constexpr Type kHalfSqrt2 = static_cast<Type>(0.7071067811865476);
+	const Eigen::Quaternion<Type> q_ned_to_enu {0.0, kHalfSqrt2, kHalfSqrt2, 0.0};  // 180 deg along X, -90 deg along Z (intrinsic)
+	const Eigen::Quaternion<Type> q_yaw_minus_pi_2{kHalfSqrt2, 0.0, 0.0, -kHalfSqrt2};  // -90 deg along Z
 
-  return q_ned_to_enu * q_ned * q_yaw_minus_pi_2 * q_ned_to_enu.inverse();
+	return q_ned_to_enu * q_ned * q_yaw_minus_pi_2 * q_ned_to_enu.inverse();
 }
 
 /**
@@ -45,13 +45,13 @@ Eigen::Quaternion<Type> attitudeNedToEnu(const Eigen::Quaternion<Type> & q_ned)
  * @return Attitude quaternion in NED frame.
  */
 template<typename Type>
-Eigen::Quaternion<Type> attitudeEnuToNed(const Eigen::Quaternion<Type> & q_enu)
+Eigen::Quaternion<Type> attitudeEnuToNed(const Eigen::Quaternion<Type>& q_enu)
 {
-  static constexpr Type kHalfSqrt2 = static_cast<Type>(0.7071067811865476);
-  const Eigen::Quaternion<Type> q_enu_to_ned {0.0, kHalfSqrt2, kHalfSqrt2, 0.0};  // 180 deg along X, -90 deg along Z (intrinsic)
-  const Eigen::Quaternion<Type> q_yaw_minus_pi_2{kHalfSqrt2, 0.0, 0.0, -kHalfSqrt2};  // -90 deg along Z
+	static constexpr Type kHalfSqrt2 = static_cast<Type>(0.7071067811865476);
+	const Eigen::Quaternion<Type> q_enu_to_ned {0.0, kHalfSqrt2, kHalfSqrt2, 0.0};  // 180 deg along X, -90 deg along Z (intrinsic)
+	const Eigen::Quaternion<Type> q_yaw_minus_pi_2{kHalfSqrt2, 0.0, 0.0, -kHalfSqrt2};  // -90 deg along Z
 
-  return q_enu_to_ned * q_enu * q_yaw_minus_pi_2 * q_enu_to_ned.inverse();
+	return q_enu_to_ned * q_enu * q_yaw_minus_pi_2 * q_enu_to_ned.inverse();
 }
 
 /**
@@ -63,12 +63,12 @@ Eigen::Quaternion<Type> attitudeEnuToNed(const Eigen::Quaternion<Type> & q_enu)
  */
 template<typename Type>
 Eigen::Matrix<Type, 3, 1> yawBodyToWorld(
-  Type yaw,
-  const Eigen::Matrix<Type, 3, 1> & point_body)
+	Type yaw,
+	const Eigen::Matrix<Type, 3, 1>& point_body)
 {
-  const Eigen::Quaternion<Type> q_z(Eigen::AngleAxis<Type>(
-      yaw, Eigen::Matrix<Type, 3, 1>::UnitZ()));
-  return q_z * point_body;
+	const Eigen::Quaternion<Type> q_z(Eigen::AngleAxis<Type>(
+			yaw, Eigen::Matrix<Type, 3, 1>::UnitZ()));
+	return q_z * point_body;
 }
 
 /**
@@ -80,7 +80,7 @@ Eigen::Matrix<Type, 3, 1> yawBodyToWorld(
 template<typename T>
 static inline T yawNedToEnu(const T yaw_ned_rad)
 {
-  return wrapPi(static_cast<T>(M_PI / 2.0) - yaw_ned_rad);
+	return wrapPi(static_cast<T>(M_PI / 2.0) - yaw_ned_rad);
 }
 
 /**
@@ -92,7 +92,7 @@ static inline T yawNedToEnu(const T yaw_ned_rad)
 template<typename T>
 static inline T yawEnuToNed(const T yaw_enu_rad)
 {
-  return wrapPi(static_cast<T>(M_PI / 2.0) - yaw_enu_rad);
+	return wrapPi(static_cast<T>(M_PI / 2.0) - yaw_enu_rad);
 }
 
 /**
@@ -120,9 +120,9 @@ static inline T yawRateEnuToNed(const T yaw_rate_enu) {return -yaw_rate_enu;}
  * @return Coordinates in ENU frame.
  */
 template<typename T>
-static inline Eigen::Matrix<T, 3, 1> positionNedToEnu(const Eigen::Matrix<T, 3, 1> & ned)
+static inline Eigen::Matrix<T, 3, 1> positionNedToEnu(const Eigen::Matrix<T, 3, 1>& ned)
 {
-  return {ned.y(), ned.x(), -ned.z()};
+	return {ned.y(), ned.x(), -ned.z()};
 }
 
 /**
@@ -132,9 +132,9 @@ static inline Eigen::Matrix<T, 3, 1> positionNedToEnu(const Eigen::Matrix<T, 3, 
  * @return Coordinates in NED frame.
  */
 template<typename T>
-static inline Eigen::Matrix<T, 3, 1> positionEnuToNed(const Eigen::Matrix<T, 3, 1> & enu)
+static inline Eigen::Matrix<T, 3, 1> positionEnuToNed(const Eigen::Matrix<T, 3, 1>& enu)
 {
-  return {enu.y(), enu.x(), -enu.z()};
+	return {enu.y(), enu.x(), -enu.z()};
 }
 
 /**
@@ -144,9 +144,9 @@ static inline Eigen::Matrix<T, 3, 1> positionEnuToNed(const Eigen::Matrix<T, 3, 
  * @return Coordinates in FLU frame.
  */
 template<typename T>
-static inline Eigen::Matrix<T, 3, 1> frdToFlu(const Eigen::Matrix<T, 3, 1> & frd)
+static inline Eigen::Matrix<T, 3, 1> frdToFlu(const Eigen::Matrix<T, 3, 1>& frd)
 {
-  return {frd.x(), -frd.y(), -frd.z()};
+	return {frd.x(), -frd.y(), -frd.z()};
 }
 
 /**
@@ -156,9 +156,9 @@ static inline Eigen::Matrix<T, 3, 1> frdToFlu(const Eigen::Matrix<T, 3, 1> & frd
  * @return Coordinates in FRD frame.
  */
 template<typename T>
-static inline Eigen::Matrix<T, 3, 1> fluToFrd(const Eigen::Matrix<T, 3, 1> & flu)
+static inline Eigen::Matrix<T, 3, 1> fluToFrd(const Eigen::Matrix<T, 3, 1>& flu)
 {
-  return {flu.x(), -flu.y(), -flu.z()};
+	return {flu.x(), -flu.y(), -flu.z()};
 }
 
 /**
@@ -168,9 +168,9 @@ static inline Eigen::Matrix<T, 3, 1> fluToFrd(const Eigen::Matrix<T, 3, 1> & flu
  * @return Variance vector in ENU frame.
  */
 template<typename T>
-static inline Eigen::Matrix<T, 3, 1> varianceNedToEnu(const Eigen::Matrix<T, 3, 1> & v_ned)
+static inline Eigen::Matrix<T, 3, 1> varianceNedToEnu(const Eigen::Matrix<T, 3, 1>& v_ned)
 {
-  return {v_ned.y(), v_ned.x(), v_ned.z()};
+	return {v_ned.y(), v_ned.x(), v_ned.z()};
 }
 
 /**
@@ -180,9 +180,9 @@ static inline Eigen::Matrix<T, 3, 1> varianceNedToEnu(const Eigen::Matrix<T, 3, 
  * @return Variance vector in NED frame.
  */
 template<typename T>
-static inline Eigen::Matrix<T, 3, 1> varianceEnuToNed(const Eigen::Matrix<T, 3, 1> & v_enu)
+static inline Eigen::Matrix<T, 3, 1> varianceEnuToNed(const Eigen::Matrix<T, 3, 1>& v_enu)
 {
-  return {v_enu.y(), v_enu.x(), v_enu.z()};
+	return {v_enu.y(), v_enu.x(), v_enu.z()};
 }
 
 /** @}*/

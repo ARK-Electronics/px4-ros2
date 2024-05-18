@@ -43,10 +43,9 @@ namespace px4_ros2
  *  @{
  */
 
-struct MessageCompatibilityTopic
-{
-  std::string topic_name;       ///< e.g. "/fmu/out/vehicle_status"
-  std::string topic_type{""};       ///< e.g. VehicleStatus. If empty, it's inferred from the topic_name // NOLINT
+struct MessageCompatibilityTopic {
+	std::string topic_name;       ///< e.g. "/fmu/out/vehicle_status"
+	std::string topic_type{""};       ///< e.g. VehicleStatus. If empty, it's inferred from the topic_name // NOLINT
 };
 
 /**
@@ -55,8 +54,8 @@ struct MessageCompatibilityTopic
  * @ingroup components
  */
 bool messageCompatibilityCheck(
-  rclcpp::Node & node, const std::vector<MessageCompatibilityTopic> & messages_to_check,
-  const std::string & topic_namespace_prefix = "");
+	rclcpp::Node& node, const std::vector<MessageCompatibilityTopic>& messages_to_check,
+	const std::string& topic_namespace_prefix = "");
 
 /** @}*/
 } // namespace px4_ros2

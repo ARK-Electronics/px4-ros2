@@ -22,20 +22,20 @@ namespace px4_ros2
 class RatesSetpointType : public SetpointBase
 {
 public:
-  explicit RatesSetpointType(Context & context);
+	explicit RatesSetpointType(Context& context);
 
-  ~RatesSetpointType() override = default;
+	~RatesSetpointType() override = default;
 
-  Configuration getConfiguration() override;
-  float desiredUpdateRateHz() override {return 200.f;}
+	Configuration getConfiguration() override;
+	float desiredUpdateRateHz() override {return 200.f;}
 
-  void update(
-    const Eigen::Vector3f & rate_setpoints_ned_rad,
-    const Eigen::Vector3f & thrust_setpoint_frd);
+	void update(
+		const Eigen::Vector3f& rate_setpoints_ned_rad,
+		const Eigen::Vector3f& thrust_setpoint_frd);
 
 private:
-  rclcpp::Node & _node;
-  rclcpp::Publisher<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr _vehicle_rates_setpoint_pub;
+	rclcpp::Node& _node;
+	rclcpp::Publisher<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr _vehicle_rates_setpoint_pub;
 };
 
 /** @}*/

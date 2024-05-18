@@ -24,37 +24,37 @@ namespace px4_ros2
 class GotoSetpointType : public SetpointBase
 {
 public:
-  explicit GotoSetpointType(Context & context);
+	explicit GotoSetpointType(Context& context);
 
-  ~GotoSetpointType() override = default;
+	~GotoSetpointType() override = default;
 
-  Configuration getConfiguration() override;
+	Configuration getConfiguration() override;
 
-  /**
-   * @brief Go-to setpoint update
-   *
-   * Unset optional values are not controlled
-   *
-   * @param position [m] NED earth-fixed frame
-   * @param heading [rad] from North
-   * @param max_horizontal_speed [m/s] in NE-datum of NED earth-fixed frame
-   * @param max_vertical_speed [m/s] in D-axis of NED earth-fixed frame
-   * @param max_heading_rate [rad/s] about D-axis of NED earth-fixed frame
-   */
-  void update(
-    const Eigen::Vector3f & position,
-    const std::optional<float> & heading = {},
-    const std::optional<float> & max_horizontal_speed = {},
-    const std::optional<float> & max_vertical_speed = {},
-    const std::optional<float> & max_heading_rate = {}
-  );
+	/**
+	 * @brief Go-to setpoint update
+	 *
+	 * Unset optional values are not controlled
+	 *
+	 * @param position [m] NED earth-fixed frame
+	 * @param heading [rad] from North
+	 * @param max_horizontal_speed [m/s] in NE-datum of NED earth-fixed frame
+	 * @param max_vertical_speed [m/s] in D-axis of NED earth-fixed frame
+	 * @param max_heading_rate [rad/s] about D-axis of NED earth-fixed frame
+	 */
+	void update(
+		const Eigen::Vector3f& position,
+		const std::optional<float>& heading = {},
+		const std::optional<float>& max_horizontal_speed = {},
+		const std::optional<float>& max_vertical_speed = {},
+		const std::optional<float>& max_heading_rate = {}
+	);
 
-  float desiredUpdateRateHz() override {return 30.f;}
+	float desiredUpdateRateHz() override {return 30.f;}
 
 private:
-  rclcpp::Node & _node;
-  rclcpp::Publisher<px4_msgs::msg::GotoSetpoint>::SharedPtr
-    _goto_setpoint_pub;
+	rclcpp::Node& _node;
+	rclcpp::Publisher<px4_msgs::msg::GotoSetpoint>::SharedPtr
+	_goto_setpoint_pub;
 };
 
 /**
@@ -63,33 +63,33 @@ private:
 class GotoGlobalSetpointType
 {
 public:
-  explicit GotoGlobalSetpointType(Context & context);
+	explicit GotoGlobalSetpointType(Context& context);
 
-  ~GotoGlobalSetpointType() = default;
+	~GotoGlobalSetpointType() = default;
 
-  /**
-   * @brief Go-to global setpoint update
-   *
-   * Unset optional values are not controlled
-   *
-   * @param global_position latitude [deg], longitude [deg], altitude AMSL [m]
-   * @param heading [rad] from North
-   * @param max_horizontal_speed [m/s] in NE-datum of NED earth-fixed frame
-   * @param max_vertical_speed [m/s] in D-axis of NED earth-fixed frame
-   * @param max_heading_rate [rad/s] about D-axis of NED earth-fixed frame
-   */
-  void update(
-    const Eigen::Vector3d & global_position,
-    const std::optional<float> & heading = {},
-    const std::optional<float> & max_horizontal_speed = {},
-    const std::optional<float> & max_vertical_speed = {},
-    const std::optional<float> & max_heading_rate = {}
-  );
+	/**
+	 * @brief Go-to global setpoint update
+	 *
+	 * Unset optional values are not controlled
+	 *
+	 * @param global_position latitude [deg], longitude [deg], altitude AMSL [m]
+	 * @param heading [rad] from North
+	 * @param max_horizontal_speed [m/s] in NE-datum of NED earth-fixed frame
+	 * @param max_vertical_speed [m/s] in D-axis of NED earth-fixed frame
+	 * @param max_heading_rate [rad/s] about D-axis of NED earth-fixed frame
+	 */
+	void update(
+		const Eigen::Vector3d& global_position,
+		const std::optional<float>& heading = {},
+		const std::optional<float>& max_horizontal_speed = {},
+		const std::optional<float>& max_vertical_speed = {},
+		const std::optional<float>& max_heading_rate = {}
+	);
 
 private:
-  rclcpp::Node & _node;
-  std::unique_ptr<MapProjection> _map_projection;
-  std::shared_ptr<GotoSetpointType> _goto_setpoint;
+	rclcpp::Node& _node;
+	std::unique_ptr<MapProjection> _map_projection;
+	std::shared_ptr<GotoSetpointType> _goto_setpoint;
 };
 
 /** @}*/
