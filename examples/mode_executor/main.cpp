@@ -2,18 +2,15 @@
  * Copyright (c) 2023 PX4 Development Team.
  * SPDX-License-Identifier: BSD-3-Clause
  ****************************************************************************/
-#pragma once
-
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/components/mode_executor.hpp>
 #include <px4_ros2/components/wait_for_fmu.hpp>
 #include <px4_ros2/control/setpoint_types/experimental/trajectory.hpp>
-
+#include <px4_ros2/components/node_with_mode.hpp>
 #include <rclcpp/rclcpp.hpp>
-
 #include <Eigen/Core>
 
-using namespace std::chrono_literals; // NOLINT
+using namespace std::chrono_literals;
 
 static const std::string kName = "Autonomous Executor";
 
@@ -122,3 +119,16 @@ public:
 private:
 	rclcpp::Node& _node;
 };
+
+using MyNodeWithModeExecutor = px4_ros2::NodeWithModeExecutor<ModeExecutorTest, FlightModeTest>;
+
+static const std::string kNodeName = "example_mode_with_executor";
+static const bool kEnableDebugOutput = true;
+
+int main(int argc, char* argv[])
+{
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<MyNodeWithModeExecutor>(kNodeName, kEnableDebugOutput));
+	rclcpp::shutdown();
+	return 0;
+}

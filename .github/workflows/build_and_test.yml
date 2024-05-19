@@ -38,7 +38,7 @@ jobs:
               },
               "test": {
                 "packages-select-regex": [
-                  "px4_ros2_cpp"
+                  "px4_ros2"
                 ],
                 "ctest-args": [
                   "-R", "unit_tests"

@@ -2,19 +2,16 @@
  * Copyright (c) 2023 PX4 Development Team.
  * SPDX-License-Identifier: BSD-3-Clause
  ****************************************************************************/
-#pragma once
-
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/components/health_and_arming_checks.hpp>
 #include <px4_ros2/components/mode_executor.hpp>
 #include <px4_ros2/control/setpoint_types/experimental/trajectory.hpp>
+#include <px4_ros2/components/node_with_mode.hpp>
 #include <px4_msgs/msg/vehicle_land_detected.hpp>
-
 #include <rclcpp/rclcpp.hpp>
-
 #include <Eigen/Core>
 
-using namespace std::chrono_literals; // NOLINT
+using namespace std::chrono_literals;
 
 static const std::string kName = "Custom RTL";
 
@@ -58,3 +55,16 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr _vehicle_land_detected_sub;
 	std::shared_ptr<px4_ros2::TrajectorySetpointType> _trajectory_setpoint;
 };
+
+using MyNodeWithMode = px4_ros2::NodeWithMode<FlightModeTest>;
+
+static const std::string kNodeName = "example_mode_rtl";
+static const bool kEnableDebugOutput = true;
+
+int main(int argc, char* argv[])
+{
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<MyNodeWithMode>(kNodeName, kEnableDebugOutput));
+	rclcpp::shutdown();
+	return 0;
+}

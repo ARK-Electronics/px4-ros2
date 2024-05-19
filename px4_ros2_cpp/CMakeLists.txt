@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(px4_ros2_cpp)
+project(px4_ros2)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
@@ -10,8 +10,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(BUILD_SHARED_LIBS ON)
 
 find_package(ament_cmake REQUIRED)
@@ -50,7 +48,7 @@ set(HEADER_FILES
         include/px4_ros2/utils/geometry.hpp
 )
 
-add_library(px4_ros2_cpp
+add_library(px4_ros2
         ${HEADER_FILES}
         src/components/health_and_arming_checks.cpp
         src/components/manual_control_input.cpp
@@ -74,9 +72,9 @@ add_library(px4_ros2_cpp
         src/utils/geodesic.cpp
         src/utils/map_projection_impl.cpp
 )
-ament_target_dependencies(px4_ros2_cpp ament_index_cpp Eigen3 rclcpp px4_msgs)
+ament_target_dependencies(px4_ros2 ament_index_cpp Eigen3 rclcpp px4_msgs)
 
-ament_export_targets(px4_ros2_cpp HAS_LIBRARY_TARGET)
+ament_export_targets(px4_ros2 HAS_LIBRARY_TARGET)
 ament_export_dependencies(
         px4_msgs
         rclcpp
@@ -88,8 +86,8 @@ install(
         DESTINATION include
 )
 install(
-        TARGETS px4_ros2_cpp
-        EXPORT px4_ros2_cpp
+        TARGETS px4_ros2
+        EXPORT px4_ros2
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin

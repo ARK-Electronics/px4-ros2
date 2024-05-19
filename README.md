@@ -41,12 +41,12 @@ Make sure you have the ROS workspace sourced.
 #### Unit tests
 You can either run the unit tests through colcon:
 ```shell
-colcon test --packages-select px4_ros2_cpp --ctest-args -R unit_tests
+colcon test --packages-select px4_ros2 --ctest-args -R unit_tests
 colcon test-result --verbose
 ```
 Or directly from the build directory, which allows to filter by individual tests:
 ```shell
-./build/px4_ros2_cpp/px4_ros2_cpp_unit_tests --gtest_filter='xy*'
+./build/px4_ros2/px4_ros2_unit_tests --gtest_filter='xy*'
 ```
 
 #### Linters (code formatting etc)

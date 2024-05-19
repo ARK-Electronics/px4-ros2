@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>px4_ros2_cpp</name>
-  <version>0.0.1</version>
+  <name>px4_ros2</name>
+  <version>0.6.9</version>
   <description>Library to interface with PX4 from ROS2</description>
-  <maintainer email="beat-kueng@gmx.net">Beat Kueng</maintainer>
+  <maintainer email="jake@arkelectron.com">Jacob Dahl</maintainer>
   <license>BSD-3-Clause</license>
 
   <buildtool_depend>eigen3_cmake_module</buildtool_depend>
