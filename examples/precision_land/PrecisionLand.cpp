@@ -2,139 +2,131 @@
  * Copyright (c) 2023 PX4 Development Team.
  * SPDX-License-Identifier: BSD-3-Clause
  ****************************************************************************/
-#include <px4_ros2/components/mode.hpp>
-#include <px4_ros2/control/setpoint_types/goto.hpp>
-#include <px4_ros2/odometry/local_position.hpp>
+
+#include "PrecisionLand.hpp"
+
 #include <px4_ros2/utils/geometry.hpp>
-#include <px4_ros2/components/node_with_mode.hpp>
-#include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/pose.hpp>
-#include <Eigen/Core>
-#include <algorithm>
 
 static const std::string kModeName = "Precision Land";
 static const bool kEnableDebugOutput = true;
 
 using namespace px4_ros2::literals;
 
-class PrecisionLand : public px4_ros2::ModeBase
+PrecisionLand::PrecisionLand(rclcpp::Node& node)
+	: ModeBase(node, kModeName)
+	, _node(node)
 {
-public:
-	explicit PrecisionLand(rclcpp::Node& node)
-		: ModeBase(node, kModeName)
-		, _node(node)
-	{
-		// Publish GoTo setpoint
-		_goto_setpoint = std::make_shared<px4_ros2::GotoSetpointType>(*this);
+	// Publish GoTo setpoint
+	_goto_setpoint = std::make_shared<px4_ros2::GotoSetpointType>(*this);
 
-		// Subscribe to VehicleLocalPosition
-		_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
-		// Subscribe to target_pose
-		_target_pose_sub = _node.create_subscription<geometry_msgs::msg::Pose>("/target_pose",
-			rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
-	}
+	// Subscribe to VehicleLocalPosition
+	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
+	// Subscribe to target_pose
+	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::Pose>("/target_pose",
+		rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
+}
 
-	void targetPoseCallback(const geometry_msgs::msg::Pose::SharedPtr msg)
-	{
-		// update target pose
-	}
+void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::Pose::SharedPtr msg)
+{
+    _target_position = Eigen::Vector3f(msg->position.x, msg->position.y, msg->position.z);
+    auto q = Eigen::Quaternionf(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+    _target_heading = px4_ros2::quaternionToYaw(q);
+}
 
-	void onActivate() override
-	{
-		_state = State::Search;
-	}
+void PrecisionLand::onActivate()
+{
+	_state = State::Search;
+}
 
-	void onDeactivate() override {}
+void PrecisionLand::onDeactivate()
+{
+	// TODO:
+}
 
-	void updateSetpoint(float dt_s) override
-	{
-		// setpoint type GoTo has a default update rate of 30Hz
-		switch (_state) {
-		case State::Search:
-			{
-				// Check target_pose timestamp
-				break;
-			}
-		case State::Approach:
-			{
-				// Check std::absf(Position - Target < Threshold)
-				break;
-			}
-		case State::Descend:
-			{
-				// Send GoTos with TargetPose
-				// Handle loss of target for T_delta
-				// ... fallback
-				// Normal land?
-				break;
-			}
-		case State::Finished:
-			{
-				// Check landed
-				break;
-			}
+void PrecisionLand::updateSetpoint(float dt_s)
+{
+	// setpoint type GoTo has a default update rate of 30Hz
+	switch (_state) {
+	case State::Search:
+		{
+			RCLCPP_INFO(_node.get_logger(), "State::Search");
+			// Check target_pose timestamp
+			break;
 		}
+	case State::Approach:
+		{
+			RCLCPP_INFO(_node.get_logger(), "State::Approach");
 
-		// _start_position_m = _vehicle_local_position->positionNed();
+			auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), _vehicle_local_position->positionNed().z());
+			auto heading = _target_heading;
 
+			_goto_setpoint->update(position, heading);
 
-		// _vehicle_local_position->heading();
-		// positionReached();
-		// headingReached();
-		// _goto_setpoint->update(_start_position_m);
-		// _goto_setpoint->update(target_position_m, heading_target_rad);
+			// -- Check std::absf(Position - Target < Threshold) --> State Transition
+			if (positionReached(position)) {
+				_state = State::Descend;
+			}
+			break;
+		}
+	case State::Descend:
+		{
+			RCLCPP_INFO(_node.get_logger(), "State::Descend");
 
-		// _goto_setpoint->update(
-		// 	target_position_m,
-		// 	_spinning_heading_rad,
-		// 	max_horizontal_velocity_m_s,
-		// 	max_vertical_velocity_m_s,
-		// 	max_heading_rate_rad_s);
+			// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
+			// TODO: use parameters
+			float max_h = 0;
+			float max_v = 3;
+			float max_heading = 180.0_deg;
 
+			auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), 696969);
+			auto heading = _target_heading;
 
+			_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
+
+			// TODO: use a paramater
+			float kDeltaVelocity = 0.25;
+			auto velocity = _vehicle_local_position->velocityNed();
+			// TODO: use land_detector or otherwise
+			bool landed = velocity.norm() < kDeltaVelocity;
+			if (landed) {
+				_state = State::Finished;
+			}
+
+			break;
+		}
+	case State::Finished:
+		{
+			RCLCPP_INFO(_node.get_logger(), "State::Finished");
+			// TODO: Now what?
+
+			// ModeBase
+			ModeBase::completed(px4_ros2::Result::Success);
+			break;
+		}
 	}
+}
 
-private:
+bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
+{
+	// TODO: parameters for delta_position and delta_velocitry
+	static constexpr float kDeltaPosition = 0.1f; // [m]
+	static constexpr float kDeltaVelocitry = 0.1f; // [m/s]
 
-	enum class State {
-		Search, // Searches for target -- TODO: optionally perform a search pattern
-		Approach, // Positioning over landing target while maintaining altitude
-		Descend, // Stay over landing target while descending
-		Finished
-	} _state;
+	auto position = _vehicle_local_position->positionNed();
+	auto velocity = _vehicle_local_position->velocityNed();
 
-	// Subscriptions
-	rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr _target_pose_sub;
+	const auto delta_pos = target - position;
+	// NOTE: this does NOT handle a moving target!
+	return (delta_pos.norm() < kDeltaPosition) && (velocity.norm() < kDeltaVelocitry);
+}
 
-	//////////////////
-	// px4_ros2_cpp //
-	//////////////////
-
-	// Subscription
-	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;
-	// Publication
-	std::shared_ptr<px4_ros2::GotoSetpointType> _goto_setpoint;
-
-  	rclcpp::Node& _node;
-
-	bool positionReached(const Eigen::Vector3f& target_position_m) const
-	{
-		static constexpr float kPositionErrorThreshold = 0.5f; // [m]
-		static constexpr float kVelocityErrorThreshold = 0.3f; // [m/s]
-		const Eigen::Vector3f position_error_m = target_position_m -
-				_vehicle_local_position->positionNed();
-		return (position_error_m.norm() < kPositionErrorThreshold) &&
-		       (_vehicle_local_position->velocityNed().norm() < kVelocityErrorThreshold);
-	}
-
-	bool headingReached(float target_heading_rad) const
-	{
-		static constexpr float kHeadingErrorThreshold = 7.0_deg;
-		const float heading_error_wrapped = px4_ros2::wrapPi(
-				target_heading_rad - _vehicle_local_position->heading());
-		return fabsf(heading_error_wrapped) < kHeadingErrorThreshold;
-	}
-};
+bool PrecisionLand::headingReached(float target) const
+{
+	// TODO: parameter for delta heading
+	static constexpr float kDeltaHeading = 10.0_deg;
+	float heading = _vehicle_local_position->heading();
+	return fabsf(px4_ros2::wrapPi(target - heading)) < kDeltaHeading;
+}
 
 int main(int argc, char* argv[])
 {
