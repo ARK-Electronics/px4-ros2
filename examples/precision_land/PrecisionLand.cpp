@@ -5,7 +5,9 @@
 
 #include "PrecisionLand.hpp"
 
+#include <px4_ros2/components/node_with_mode.hpp>
 #include <px4_ros2/utils/geometry.hpp>
+#include <Eigen/Core>
 
 static const std::string kModeName = "Precision Land";
 static const bool kEnableDebugOutput = true;
@@ -23,14 +25,14 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
 	// Subscribe to target_pose
 	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::Pose>("/target_pose",
-		rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
+			   rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
 }
 
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::Pose::SharedPtr msg)
 {
-    _target_position = Eigen::Vector3f(msg->position.x, msg->position.y, msg->position.z);
-    auto q = Eigen::Quaternionf(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
-    _target_heading = px4_ros2::quaternionToYaw(q);
+	_target_position = Eigen::Vector3f(msg->position.x, msg->position.y, msg->position.z);
+	auto q = Eigen::Quaternionf(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+	_target_heading = px4_ros2::quaternionToYaw(q);
 }
 
 void PrecisionLand::onActivate()
@@ -47,70 +49,68 @@ void PrecisionLand::updateSetpoint(float dt_s)
 {
 	// setpoint type GoTo has a default update rate of 30Hz
 	switch (_state) {
-	case State::Search:
-		{
-			RCLCPP_INFO(_node.get_logger(), "State::Search");
-			// Check target_pose timestamp
-			break;
-		}
-	case State::Approach:
-		{
-			RCLCPP_INFO(_node.get_logger(), "State::Approach");
-
-			auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), _vehicle_local_position->positionNed().z());
-			auto heading = _target_heading;
-
-			_goto_setpoint->update(position, heading);
-
-			// -- Check std::absf(Position - Target < Threshold) --> State Transition
-			if (positionReached(position)) {
-				_state = State::Descend;
-			}
-			break;
-		}
-	case State::Descend:
-		{
-			RCLCPP_INFO(_node.get_logger(), "State::Descend");
-
-			// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
-			// TODO: use parameters
-			float max_h = 0;
-			float max_v = 3;
-			float max_heading = 180.0_deg;
-
-			auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), 696969);
-			auto heading = _target_heading;
-
-			_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
-
-			// TODO: use a paramater
-			float kDeltaVelocity = 0.25;
-			auto velocity = _vehicle_local_position->velocityNed();
-			// TODO: use land_detector or otherwise
-			bool landed = velocity.norm() < kDeltaVelocity;
-			if (landed) {
-				_state = State::Finished;
-			}
-
-			break;
-		}
-	case State::Finished:
-		{
-			RCLCPP_INFO(_node.get_logger(), "State::Finished");
-			// TODO: Now what?
-
-			// ModeBase
-			ModeBase::completed(px4_ros2::Result::Success);
-			break;
-		}
+	case State::Search: {
+		RCLCPP_INFO(_node.get_logger(), "State::Search");
+		// Check target_pose timestamp
+		break;
 	}
+
+	case State::Approach: {
+		RCLCPP_INFO(_node.get_logger(), "State::Approach");
+
+		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), _vehicle_local_position->positionNed().z());
+		auto heading = _target_heading;
+
+		_goto_setpoint->update(position, heading);
+
+		// -- Check std::absf(Position - Target < Threshold) --> State Transition
+		if (positionReached(position)) {
+			_state = State::Descend;
+		}
+
+		break;
+	}
+
+	case State::Descend: {
+		RCLCPP_INFO(_node.get_logger(), "State::Descend");
+
+		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
+		// TODO: use parameters
+		float max_h = 0;
+		float max_v = 3;
+		float max_heading = 180.0_deg;
+
+		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), 696969);
+		auto heading = _target_heading;
+
+		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
+
+		// TODO: use a paramater
+		float kDeltaVelocity = 0.25;
+		auto velocity = _vehicle_local_position->velocityNed();
+		// TODO: use land_detector or otherwise
+		bool landed = velocity.norm() < kDeltaVelocity;
+
+		if (landed) {
+			_state = State::Finished;
+		}
+
+		break;
+	}
+
+	case State::Finished: {
+		RCLCPP_INFO(_node.get_logger(), "State::Finished");
+		ModeBase::completed(px4_ros2::Result::Success);
+		break;
+	}
+	} // end switch/case
 }
 
 bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
 {
 	// TODO: parameters for delta_position and delta_velocitry
-	static constexpr float kDeltaPosition = 0.1f; // [m]
-	static constexpr float kDeltaVelocitry = 0.1f; // [m/s]
+	static constexpr float kDeltaPosition = 0.1f;
+	static constexpr float kDeltaVelocitry = 0.1f;
 
 	auto position = _vehicle_local_position->positionNed();
 	auto velocity = _vehicle_local_position->velocityNed();

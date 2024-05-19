@@ -20,7 +20,6 @@ class PrecisionLand : public px4_ros2::ModeBase
 public:
 	explicit PrecisionLand(rclcpp::Node& node);
 
-	// Subscription calbacks
 	void targetPoseCallback(const geometry_msgs::msg::Pose::SharedPtr msg);
 
 	// See ModeBase
@@ -33,29 +32,22 @@ private:
 	bool headingReached(float target) const;
 
 	enum class State {
-		Search, // Searches for target -- TODO: optionally perform a search pattern
-		Approach, // Positioning over landing target while maintaining altitude
-		Descend, // Stay over landing target while descending
+		Search, 	// Searches for target -- TODO: optionally perform a search pattern
+		Approach, 	// Positioning over landing target while maintaining altitude
+		Descend, 	// Stay over landing target while descending
 		Finished
 	};
 
-	State _state = State::Search;
-
-	// Subscriptions
+	// ros2
+	rclcpp::Node& _node;
 	rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr _target_pose_sub;
 
-	//////////////////
-	// px4_ros2_cpp //
-	//////////////////
-
-	// Subscription
+	// px4_ros2_cpp
 	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;
-	// Publication
 	std::shared_ptr<px4_ros2::GotoSetpointType> _goto_setpoint;
 
-  	rclcpp::Node& _node;
-
-  	// Data
-  	Eigen::Vector3f _target_position = {};
-  	float _target_heading = {};
+	// Data
+	State _state = State::Search;
+	Eigen::Vector3f _target_position = {};
+	float _target_heading = {};
 };
