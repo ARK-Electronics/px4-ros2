@@ -24,15 +24,16 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	// Subscribe to VehicleLocalPosition
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
 	// Subscribe to target_pose
-	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::Pose>("/target_pose",
+	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>("/target_pose",
 			   rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
 }
 
-void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::Pose::SharedPtr msg)
+void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
-	_target_position = Eigen::Vector3f(msg->position.x, msg->position.y, msg->position.z);
-	auto q = Eigen::Quaternionf(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+	_target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+	auto q = Eigen::Quaternionf(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
 	_target_heading = px4_ros2::quaternionToYaw(q);
+	_last_target_timestamp = msg->header.stamp;
 }
 
 void PrecisionLand::onActivate()
@@ -45,13 +46,20 @@ void PrecisionLand::onDeactivate()
 	// TODO:
 }
 
+// GoTo setpoint type has a default update rate of 30Hz
 void PrecisionLand::updateSetpoint(float dt_s)
 {
-	// setpoint type GoTo has a default update rate of 30Hz
 	switch (_state) {
 	case State::Search: {
 		RCLCPP_INFO(_node.get_logger(), "State::Search");
-		// Check target_pose timestamp
+
+		auto current_time = _node.get_clock()->now();
+		auto time_delta = rclcpp::Duration::from_seconds(0.2); // 200 milliseconds
+
+		if ((current_time - _last_target_timestamp) > time_delta) {
+			_state = State::Approach;
+		}
+
 		break;
 	}
 
@@ -85,10 +93,10 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
 
+		// TODO: use land_detector or otherwise
 		// TODO: use a paramater
 		float kDeltaVelocity = 0.25;
 		auto velocity = _vehicle_local_position->velocityNed();
-		// TODO: use land_detector or otherwise
 		bool landed = velocity.norm() < kDeltaVelocity;
 
 		if (landed) {
