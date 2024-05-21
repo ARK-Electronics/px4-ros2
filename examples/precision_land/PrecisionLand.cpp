@@ -84,18 +84,20 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
 		// TODO: use parameters
-		float max_h = 0;
-		float max_v = 3;
+		float max_h = 3;
+		float max_v = 1;
 		float max_heading = 180.0_deg;
+		// Z target one meter below ground
+		float z_target = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 1;
 
-		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), 696969);
+		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), z_target);
 		auto heading = _target_heading;
 
 		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
 
 		// TODO: use land_detector or otherwise
 		// TODO: use a paramater
-		float kDeltaVelocity = 0.25;
+		float kDeltaVelocity = 0.1;
 		auto velocity = _vehicle_local_position->velocityNed();
 		bool landed = velocity.norm() < kDeltaVelocity;
 

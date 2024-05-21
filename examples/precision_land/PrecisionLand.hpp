@@ -8,6 +8,7 @@
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/control/setpoint_types/goto.hpp>
 #include <px4_ros2/odometry/local_position.hpp>
+#include <px4_msgs/msg/distance_sensor.hpp>
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -42,6 +43,9 @@ private:
 	// px4_ros2_cpp
 	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;
 	std::shared_ptr<px4_ros2::GotoSetpointType> _goto_setpoint;
+
+	// px4
+	rclcpp::Subscription<px4_msgs::msg::DistanceSensor>::SharedPtr _distance_sub;
 
 	// Data
 	State _state = State::Search;
