@@ -15,6 +15,8 @@ public:
 
 private:
 	void image_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+	void vehicle_local_position_callback(const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg);
+
 
 	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr _image_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr _vehicle_local_position_sub;
@@ -22,15 +24,12 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr _image_pub;
 	rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr _target_pose_pub;
 
-	// px4_msgs
-	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;
-
 	// Data
 	cv::Ptr<cv::aruco::Dictionary> _dictionary;
 	cv::Mat _camera_matrix;
 	cv::Mat _dist_coeffs;
 
-	Eigen::Vector3f postionNED = {};
+	float _distance_to_ground = {};
 	float heading = {};
 };
 

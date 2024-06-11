@@ -34,13 +34,14 @@ ArucoTrackerNode::ArucoTrackerNode()
 		"/image_proc", qos);
 	_target_pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>(
 		"/target_pose", qos);
-
-	// Subscribe to VehicleLocalPosition
-	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
 }
-void ArucoTrackerNode::vehicle_local_position_callback(const px4_msgs::msg::VehicleLocalPosition msg)
+void ArucoTrackerNode::vehicle_local_position_callback(const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg)
 {
-
+	if (msg->dist_bottom_valid) {
+		_distance_to_ground = msg->dist_bottom;
+	} else {
+		_distance_to_ground = NAN;
+	}
 }
 
 void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
@@ -60,7 +61,7 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 			// Real world size = (pixel size / focal length) * distance to object
 			float pixel_width = cv::norm(corners[i][0] - corners[i][1]);
 			float focal_length = _camera_matrix.at<double>(0, 0);
-			float marker_size = (pixel_width / focal_length) * _vehicle_local_position->distanceGround();
+			float marker_size = (pixel_width / focal_length) * _distance_to_ground;
 			if (!std::isnan(marker_size) && !std::isinf(marker_size)) {
 				RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
 				std::vector<cv::Point3f> objectPoints;
