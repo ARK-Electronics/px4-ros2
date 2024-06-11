@@ -82,6 +82,12 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	case State::Descend: {
 		RCLCPP_INFO(_node.get_logger(), "State::Descend");
 
+		// TODO: check if distance to bottom is still valid
+		// - if invalid stop
+		// - start timeout, switch to failsafe if timed out : failsafe = normal land
+
+		// TODO: while in failsafe (normal land) keep checking conditions to switch back into precision land
+
 		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
 		// TODO: use parameters
 		float max_h = 3;

@@ -1,33 +1,4 @@
-#include <memory>
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/image.hpp>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/aruco.hpp>
-#include <opencv2/core/quaternion.hpp>
-#include <px4_msgs/msg/distance_sensor.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
-
-class ArucoTrackerNode : public rclcpp::Node
-{
-public:
-	ArucoTrackerNode();
-
-private:
-	void image_callback(const sensor_msgs::msg::Image::SharedPtr msg);
-	void distance_sensor_callback(const px4_msgs::msg::DistanceSensor::SharedPtr msg);
-
-	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr _image_sub;
-	rclcpp::Subscription<px4_msgs::msg::DistanceSensor>::SharedPtr _distance_sub;
-
-	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr _image_pub;
-	rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr _target_pose_pub;
-	cv::Ptr<cv::aruco::Dictionary> _dictionary;
-	// float _ground_distance = 0.f;
-	float _ground_distance = 1.f;
-	cv::Mat _camera_matrix;
-	cv::Mat _dist_coeffs;
-};
+#include "ArucoTracker.hpp"
 
 ArucoTrackerNode::ArucoTrackerNode()
 	: Node("aruco_tracker_node")
@@ -56,18 +27,20 @@ ArucoTrackerNode::ArucoTrackerNode()
 
 	_image_sub = this->create_subscription<sensor_msgs::msg::Image>(
 		"/camera", qos, std::bind(&ArucoTrackerNode::image_callback, this, std::placeholders::_1));
-	_distance_sub = this->create_subscription<px4_msgs::msg::DistanceSensor>(
-		"/fmu/out/distance_sensor", qos, std::bind(&ArucoTrackerNode::distance_sensor_callback, this, std::placeholders::_1));
+	_vehicle_local_position_sub = this->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
+		"/fmu/out/vehicle_local_position", qos, std::bind(&ArucoTrackerNode::vehicle_local_position_callback, this, std::placeholders::_1));
+
 	_image_pub = this->create_publisher<sensor_msgs::msg::Image>(
 		"/image_proc", qos);
 	_target_pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>(
 		"/target_pose", qos);
-}
 
-void ArucoTrackerNode::distance_sensor_callback(const px4_msgs::msg::DistanceSensor::SharedPtr msg)
+	// Subscribe to VehicleLocalPosition
+	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
+}
+void ArucoTrackerNode::vehicle_local_position_callback(const px4_msgs::msg::VehicleLocalPosition msg)
 {
-	RCLCPP_DEBUG(this->get_logger(), "got distance: %f", msg->current_distance);
-	_ground_distance = msg->current_distance;
+
 }
 
 void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
@@ -82,8 +55,12 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 
 		// Calculate marker Pose and draw axes
 		for (size_t i = 0; i < ids.size(); i++) {
+			// NOTE: This calculation assumes that the marker is perpendicular to the direction of the view of the camera
+			// NOTE: This calculate is derived from the pinhole camera model
+			// Real world size = (pixel size / focal length) * distance to object
 			float pixel_width = cv::norm(corners[i][0] - corners[i][1]);
-			float marker_size = (pixel_width / _camera_matrix.at<double>(0, 0)) * _ground_distance;
+			float focal_length = _camera_matrix.at<double>(0, 0);
+			float marker_size = (pixel_width / focal_length) * _vehicle_local_position->distanceGround();
 			if (!std::isnan(marker_size) && !std::isinf(marker_size)) {
 				RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
 				std::vector<cv::Point3f> objectPoints;
