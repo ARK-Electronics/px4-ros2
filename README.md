@@ -54,3 +54,31 @@ These run automatically when committing code. To manually run them, use:
 ```shell
 pre-commit run -a
 ```
+
+#### Run the precision_land_custom mode
+Make sure that you build your workspace and do the following commands at the right places:
+```
+MicroXRCEAgent udp4 -p 8888
+```
+```
+make px4_sitl_default gz_x500_depth
+```
+```
+ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image@gz.msgs.Image 
+```
+```
+rqt
+```
+```
+./QGroundControl.AppImage
+```
+```
+ros2 run  aruco_tracker aruco_tracker
+```
+Take off and fly away using Go To Location in QGC
+
+run the command below to execute the search and the prescion landing
+```
+ros2 run precision_land precision_land 
+```
+
