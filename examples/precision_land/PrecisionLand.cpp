@@ -8,6 +8,7 @@
 #include <px4_ros2/components/node_with_mode.hpp>
 #include <px4_ros2/utils/geometry.hpp>
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 
 static const std::string kModeName = "PrecisionLandCustom";
 static const bool kEnableDebugOutput = true;
@@ -23,6 +24,10 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 
 	// Subscribe to VehicleLocalPosition
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
+
+	// Subscribe to VehicleAttitude
+	_vehicle_attitude= std::make_shared<px4_ros2::OdometryAttitude>(*this);
+
 	// Subscribe to target_pose
 	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>("/target_pose",
 			   rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
@@ -30,10 +35,23 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
-	_target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 	auto q = Eigen::Quaternionf(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
 	_target_heading = px4_ros2::quaternionToYaw(q);
 	_last_target_timestamp = msg->header.stamp;
+
+	auto vehicle_q = _vehicle_attitude->attitude();
+
+	(void)vehicle_q;
+
+    // Fetch vehicle's current heading (yaw)
+    float vehicle_heading = _vehicle_local_position->heading();  // Placeholder for your method to get the heading
+
+	// TODO: rotate the XYZ into world frame
+    Eigen::Matrix3f rotation_matrix;
+    rotation_matrix = Eigen::AngleAxisf(vehicle_heading, Eigen::Vector3f::UnitZ());
+
+    auto target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    _target_position = rotation_matrix * target_position;
 }
 
 void PrecisionLand::onActivate()
@@ -57,9 +75,31 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		auto time_delta = rclcpp::Duration::from_seconds(0.2); // 200 milliseconds
 
 		if ((current_time - _last_target_timestamp) > time_delta) {
-			_state = State::Approach;
+			// _state = State::Approach;
+			_state = State::AlignHeading;
+			_align_position = _vehicle_local_position->positionNed();
+
+
+			// TODO: configurable param in the case that target is not visible
+			// _approach_altitude = _vehicle_local_position->positionNed().z();
 		}
 
+		break;
+	}
+
+	case State::AlignHeading: {
+		RCLCPP_INFO(_node.get_logger(), "State::AlignHeading");
+		RCLCPP_INFO(_node.get_logger(), "current_heading: %f", double(_vehicle_local_position->heading()));
+		RCLCPP_INFO(_node.get_logger(), "target_heading: %f", double(_target_heading));
+
+
+		auto heading_setpoint = _vehicle_local_position->heading() + _target_heading;
+		_goto_setpoint->update(_align_position, heading_setpoint);
+
+		if (headingReached(heading_setpoint)) {
+			_approach_altitude = _vehicle_local_position->positionNed().z();
+			_state = State::Approach;
+		}
 		break;
 	}
 
@@ -68,10 +108,10 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		auto target_x = _vehicle_local_position->positionNed().x() + _target_position.x();
 		auto target_y = _vehicle_local_position->positionNed().y() + _target_position.y();
-		auto target_z = _vehicle_local_position->positionNed().z();
 
-		auto position = Eigen::Vector3f(target_x, target_y, target_z);
-		auto heading = _target_heading;
+		auto position = Eigen::Vector3f(target_x, target_y, _approach_altitude);
+		// auto heading = _target_heading;
+		auto heading = _vehicle_local_position->heading() + _target_heading;
 
 		_goto_setpoint->update(position, heading);
 
@@ -94,14 +134,17 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
 		// TODO: use parameters
-		float max_h = 3;
-		float max_v = 1;
-		float max_heading = 180.0_deg;
+		float max_h = 0.25;
+		float max_v = 0.25;
+		float max_heading = 90.0_deg;
 		// Z target one meter below ground
-		float z_target = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 1;
+		auto target_x = _vehicle_local_position->positionNed().x() + _target_position.x();
+		auto target_y = _vehicle_local_position->positionNed().y() + _target_position.y();
+		auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 1;
 
-		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), z_target);
-		auto heading = _target_heading;
+		auto position = Eigen::Vector3f(target_x, target_y, target_z);
+		// auto heading = _target_heading;
+		auto heading = _vehicle_local_position->heading() + _target_heading;
 
 		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
 
@@ -129,15 +172,15 @@ void PrecisionLand::updateSetpoint(float dt_s)
 bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
 {
 	// TODO: parameters for delta_position and delta_velocitry
-	static constexpr float kDeltaPosition = 0.1f;
-	static constexpr float kDeltaVelocitry = 0.1f;
+	static constexpr float kDeltaPosition = 0.25f;
+	static constexpr float kDeltaVelocity = 0.25f;
 
 	auto position = _vehicle_local_position->positionNed();
 	auto velocity = _vehicle_local_position->velocityNed();
 
 	const auto delta_pos = target - position;
 	// NOTE: this does NOT handle a moving target!
-	return (delta_pos.norm() < kDeltaPosition) && (velocity.norm() < kDeltaVelocitry);
+	return (delta_pos.norm() < kDeltaPosition) && (velocity.norm() < kDeltaVelocity);
 }
 
 bool PrecisionLand::headingReached(float target) const

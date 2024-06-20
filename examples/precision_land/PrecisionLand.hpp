@@ -8,6 +8,7 @@
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/control/setpoint_types/goto.hpp>
 #include <px4_ros2/odometry/local_position.hpp>
+#include <px4_ros2/odometry/attitude.hpp>
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -19,7 +20,7 @@ public:
 
 	void targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 
-	// See ModeBase
+	// See ModeBasep
 	void onActivate() override;
 	void onDeactivate() override;
 	void updateSetpoint(float dt_s) override;
@@ -30,6 +31,7 @@ private:
 
 	enum class State {
 		Search, 	// Searches for target -- TODO: optionally perform a search pattern
+		AlignHeading,
 		Approach, 	// Positioning over landing target while maintaining altitude
 		Descend, 	// Stay over landing target while descending
 		Finished
@@ -41,11 +43,15 @@ private:
 
 	// px4_ros2_cpp
 	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;
+	std::shared_ptr<px4_ros2::OdometryAttitude> _vehicle_attitude;
 	std::shared_ptr<px4_ros2::GotoSetpointType> _goto_setpoint;
 
 	// Data
 	State _state = State::Search;
 	Eigen::Vector3f _target_position = {};
 	float _target_heading = {};
+	float _approach_altitude = {};
+	Eigen::Vector3f _align_position = {};
+
 	rclcpp::Time _last_target_timestamp;
 };
