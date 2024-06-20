@@ -70,14 +70,14 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 				float pixel_width = cv::norm(undistortedCorners[i][0] - undistortedCorners[i][1]);
 				float focal_length = _camera_matrix.at<double>(0, 0);
 				float marker_size = (pixel_width / focal_length) * _distance_to_ground;
-				RCLCPP_INFO(this->get_logger(), "pixel_width: %f", pixel_width);
-				RCLCPP_INFO(this->get_logger(), "focal_length: %f", focal_length);
-				RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
+				// RCLCPP_INFO(this->get_logger(), "pixel_width: %f", pixel_width);
+				// RCLCPP_INFO(this->get_logger(), "focal_length: %f", focal_length);
+				// RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
 
 				if (!std::isnan(marker_size) && !std::isinf(marker_size) && marker_size > 0) {
 
 					// Calculate marker size from camera intrinsics
-					RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
+					// RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
 					float half_size = marker_size / 2.0f;
 					std::vector<cv::Point3f> objectPoints = {
 					    cv::Point3f(-half_size,  half_size, 0),  // top left
@@ -106,16 +106,19 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 					cv::Point textOrg((cv_ptr->image.cols - textSize.width - 10), (cv_ptr->image.rows - 10));
 					cv::putText(cv_ptr->image, text_xyz, textOrg, fontFace, fontScale, cv::Scalar(0,255,255), thickness, 8);
 
-					RCLCPP_INFO(this->get_logger(), "tvec: [%f, %f, %f]", tvec[0], tvec[1], tvec[2]);
-					RCLCPP_INFO(this->get_logger(), "rvec: [%f, %f, %f]", rvec[0], rvec[1], rvec[2]);
+					// RCLCPP_INFO(this->get_logger(), "tvec: [%f, %f, %f]", tvec[0], tvec[1], tvec[2]);
+					// RCLCPP_INFO(this->get_logger(), "rvec: [%f, %f, %f]", rvec[0], rvec[1], rvec[2]);
 
 					// Publish target pose
 					geometry_msgs::msg::PoseStamped target_pose;
 					target_pose.header.stamp = msg->header.stamp;
 					target_pose.header.frame_id = "camera_frame"; // TODO: frame_id
-					target_pose.pose.position.x = tvec[0];
-					target_pose.pose.position.y = tvec[1];
-					target_pose.pose.position.z = tvec[2];
+
+					// Convert to drone local frame (FRD)
+					// Camera frame is RBU
+					target_pose.pose.position.x = -tvec[1];
+					target_pose.pose.position.y = tvec[0];
+					target_pose.pose.position.z = -tvec[2];
 					cv::Mat rot_mat;
 					cv::Rodrigues(rvec, rot_mat);
 					RCLCPP_DEBUG(this->get_logger(), "Rot mat type: %d, rows: %d, cols: %d", rot_mat.type(), rot_mat.rows, rot_mat.cols);

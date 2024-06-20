@@ -9,7 +9,7 @@
 #include <px4_ros2/utils/geometry.hpp>
 #include <Eigen/Core>
 
-static const std::string kModeName = "Precision Land";
+static const std::string kModeName = "PrecisionLandCustom";
 static const bool kEnableDebugOutput = true;
 
 using namespace px4_ros2::literals;
@@ -66,7 +66,11 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	case State::Approach: {
 		RCLCPP_INFO(_node.get_logger(), "State::Approach");
 
-		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), _vehicle_local_position->positionNed().z());
+		auto target_x = _vehicle_local_position->positionNed().x() + _target_position.x();
+		auto target_y = _vehicle_local_position->positionNed().y() + _target_position.y();
+		auto target_z = _vehicle_local_position->positionNed().z();
+
+		auto position = Eigen::Vector3f(target_x, target_y, target_z);
 		auto heading = _target_heading;
 
 		_goto_setpoint->update(position, heading);
