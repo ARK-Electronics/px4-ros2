@@ -92,9 +92,10 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 					// Annotate the image
 					cv::aruco::drawAxis(cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec, marker_size);
 
-					double target_x = -tvec[0];
-					double target_y = -tvec[1];
-					double target_z = -tvec[2];
+					// In OpenCV frame
+					double target_x = tvec[0];
+					double target_y = tvec[1];
+					double target_z = tvec[2];
 
 					std::ostringstream stream;
 					stream << std::fixed << std::setprecision(2);
@@ -118,10 +119,10 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 					target_pose.header.stamp = msg->header.stamp;
 					target_pose.header.frame_id = "camera_frame"; // TODO: frame_id
 
-					// Convert to drone local frame (LFD)
+					// Staying in camera frame, but shift the origin to the center of the marker
 					// Camera frame is RBU
-					target_pose.pose.position.x = target_x;
-					target_pose.pose.position.y = target_y;
+					target_pose.pose.position.x = target_x+half_size;
+					target_pose.pose.position.y = target_y-half_size;
 					target_pose.pose.position.z = target_z;
 					cv::Mat rot_mat;
 					cv::Rodrigues(rvec, rot_mat);
@@ -129,9 +130,9 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 					// TODO: why is the rotation matrix sometimes malformed?
 					if (rot_mat.type() == CV_64FC1 && rot_mat.rows == 3 && rot_mat.cols == 3) {
 						cv::Quatd quat = cv::Quatd::createFromRotMat(rot_mat).normalize();
-						target_pose.pose.orientation.x = -quat.x;
-						target_pose.pose.orientation.y = -quat.y;
-						target_pose.pose.orientation.z = -quat.z;
+						target_pose.pose.orientation.x = quat.x;
+						target_pose.pose.orientation.y = quat.y;
+						target_pose.pose.orientation.z = quat.z;
 						target_pose.pose.orientation.w = quat.w;
 
 						_target_pose_pub->publish(target_pose);
