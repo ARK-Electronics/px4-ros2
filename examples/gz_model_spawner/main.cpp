@@ -2,19 +2,22 @@
 #include <ros_gz_interfaces/srv/spawn_entity.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 
-class ModelSpawner : public rclcpp::Node {
+class ModelSpawner : public rclcpp::Node
+{
 public:
-	ModelSpawner() : Node("model_spawner") {
+	ModelSpawner() : Node("model_spawner")
+	{
 		// NOTE: model spawning is not supported in ros_gz
 		std::string service_name = "/world/default/create";
 		client_ = this->create_client<ros_gz_interfaces::srv::SpawnEntity>(service_name);
 
 		while (!client_->wait_for_service(std::chrono::seconds(1))) {
-				if (!rclcpp::ok()) {
-						RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service. Exiting.");
-						return;
-				}
-				RCLCPP_INFO(this->get_logger(), "Waiting for the service [%s] to appear...", service_name.c_str());
+			if (!rclcpp::ok()) {
+				RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service. Exiting.");
+				return;
+			}
+
+			RCLCPP_INFO(this->get_logger(), "Waiting for the service [%s] to appear...", service_name.c_str());
 		}
 
 		auto request = std::make_shared<ros_gz_interfaces::srv::SpawnEntity::Request>();
@@ -62,21 +65,23 @@ public:
 
 		// Use shared_from_this to correctly pass the shared pointer
 		if (rclcpp::spin_until_future_complete(this->shared_from_this(), result_future) ==
-				rclcpp::FutureReturnCode::SUCCESS) {
-				RCLCPP_INFO(this->get_logger(), "Model spawned successfully.");
+		    rclcpp::FutureReturnCode::SUCCESS) {
+			RCLCPP_INFO(this->get_logger(), "Model spawned successfully.");
+
 		} else {
-				RCLCPP_ERROR(this->get_logger(), "Failed to call service.");
+			RCLCPP_ERROR(this->get_logger(), "Failed to call service.");
 		}
 	}
 
 private:
-		rclcpp::Client<ros_gz_interfaces::srv::SpawnEntity>::SharedPtr client_;
+	rclcpp::Client<ros_gz_interfaces::srv::SpawnEntity>::SharedPtr client_;
 };
 
-int main(int argc, char** argv) {
-		rclcpp::init(argc, argv);
-		auto node = std::make_shared<ModelSpawner>();
-		rclcpp::spin(node);
-		rclcpp::shutdown();
-		return 0;
+int main(int argc, char** argv)
+{
+	rclcpp::init(argc, argv);
+	auto node = std::make_shared<ModelSpawner>();
+	rclcpp::spin(node);
+	rclcpp::shutdown();
+	return 0;
 }

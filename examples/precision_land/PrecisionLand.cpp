@@ -26,7 +26,7 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
 
 	// Subscribe to VehicleAttitude
-	_vehicle_attitude= std::make_shared<px4_ros2::OdometryAttitude>(*this);
+	_vehicle_attitude = std::make_shared<px4_ros2::OdometryAttitude>(*this);
 
 	// Subscribe to target_pose
 	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>("/target_pose",
@@ -35,28 +35,86 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
-	auto q = Eigen::Quaternionf(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
-	_target_heading = px4_ros2::quaternionToYaw(q);
-	_last_target_timestamp = msg->header.stamp;
+	// auto q = Eigen::Quaternionf(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
+	// _target_heading = px4_ros2::quaternionToYaw(q);
+	// _last_target_timestamp = msg->header.stamp;
 
+	// auto vehicle_q = _vehicle_attitude->attitude();
+
+	// (void)vehicle_q;
+
+	// Fetch vehicle's current heading (yaw)
+	// float vehicle_heading = _vehicle_local_position->heading();  // Placeholder for your method to get the heading
+
+	// // TODO: rotate the XYZ into world frame
+	// Eigen::Matrix3f rotation_matrix;
+	// rotation_matrix = Eigen::AngleAxisf(vehicle_heading, Eigen::Vector3f::UnitZ());
+
+	// auto target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+	// _target_position = rotation_matrix * target_position;
+
+	// Aruco pose in camera frame
+	_aruco_pose.position.x = msg->pose.position.x;
+	_aruco_pose.position.y = msg->pose.position.y;
+	_aruco_pose.position.z = msg->pose.position.z;
+	_aruco_pose.orientation.w = msg->pose.orientation.w;
+	_aruco_pose.orientation.x = msg->pose.orientation.x;
+	_aruco_pose.orientation.y = msg->pose.orientation.y;
+	_aruco_pose.orientation.z = msg->pose.orientation.z;
+
+	// Camera pose in drone frame
+	Eigen::Matrix3f R;
+	R << 0, -1, 0,
+	1, 0, 0,
+	0, 0, 1;
+	Eigen::Quaternionf quat(R);
+	_camera_pose.position.x = 0;// camera case and camera position
+	_camera_pose.position.y = 0;// camera case and camera position
+	_camera_pose.position.z = 0;
+	_camera_pose.orientation.w = quat.w();
+	_camera_pose.orientation.x = quat.x();
+	_camera_pose.orientation.y = quat.y();
+	_camera_pose.orientation.z = quat.z();
+
+	// Drone pose in world frame
 	auto vehicle_q = _vehicle_attitude->attitude();
+	_drone_pose.position.x = _vehicle_local_position->positionNed().x();
+	_drone_pose.position.y = _vehicle_local_position->positionNed().y();
+	_drone_pose.position.z = _vehicle_local_position->positionNed().z();
+	_drone_pose.orientation.w = vehicle_q.w();
+	_drone_pose.orientation.x = vehicle_q.x();
+	_drone_pose.orientation.y = vehicle_q.y();
+	_drone_pose.orientation.z = vehicle_q.z();
 
-	(void)vehicle_q;
 
-    // Fetch vehicle's current heading (yaw)
-    float vehicle_heading = _vehicle_local_position->heading();  // Placeholder for your method to get the heading
+	// Convert to KDL::Frame
+	KDL::Frame frame_drone, frame_camera, frame_aruco;
+	tf2::fromMsg(_drone_pose, frame_drone);
+	tf2::fromMsg(_camera_pose, frame_camera);
+	tf2::fromMsg(_aruco_pose, frame_aruco);
 
-	// TODO: rotate the XYZ into world frame
-    Eigen::Matrix3f rotation_matrix;
-    rotation_matrix = Eigen::AngleAxisf(vehicle_heading, Eigen::Vector3f::UnitZ());
+	// Calculate the pose of the aruco in the world frame
+	KDL::Frame frame_aruco_world = frame_drone * frame_camera * frame_aruco;
 
-    auto target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-    _target_position = rotation_matrix * target_position;
+	// Convert to geometry_msgs::Pose
+	geometry_msgs::msg::Pose pose_aruco_in_world = tf2::toMsg(frame_aruco_world);
+
+	auto q = Eigen::Quaternionf(pose_aruco_in_world.orientation.w, pose_aruco_in_world.orientation.x, pose_aruco_in_world.orientation.y, pose_aruco_in_world.orientation.z);
+	_target_heading = px4_ros2::quaternionToYaw(q);
+	// _last_target_timestamp = msg->header.stamp;
+
+
+
+	auto target_position = Eigen::Vector3f(pose_aruco_in_world.position.x, pose_aruco_in_world.position.y, pose_aruco_in_world.position.z);
+	_target_position = target_position;
+	RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
 }
 
 void PrecisionLand::onActivate()
 {
-	_state = State::Search;
+	// _state = State::Search;
+	// Skipping search for now, it was giving timesource errors
+	_state = State::Approach;
 }
 
 void PrecisionLand::onDeactivate()
@@ -100,18 +158,20 @@ void PrecisionLand::updateSetpoint(float dt_s)
 			_approach_altitude = _vehicle_local_position->positionNed().z();
 			_state = State::Approach;
 		}
+
 		break;
 	}
 
 	case State::Approach: {
 		RCLCPP_INFO(_node.get_logger(), "State::Approach");
 
-		auto target_x = _vehicle_local_position->positionNed().x() + _target_position.x();
-		auto target_y = _vehicle_local_position->positionNed().y() + _target_position.y();
+		auto target_x = _target_position.x();
+		auto target_y = _target_position.y();
 
 		auto position = Eigen::Vector3f(target_x, target_y, _approach_altitude);
+		_approach_altitude = _vehicle_local_position->positionNed().z();
 		// auto heading = _target_heading;
-		auto heading = _vehicle_local_position->heading() + _target_heading;
+		auto heading = _target_heading;
 
 		_goto_setpoint->update(position, heading);
 
@@ -144,17 +204,24 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		auto position = Eigen::Vector3f(target_x, target_y, target_z);
 		// auto heading = _target_heading;
-		auto heading = _vehicle_local_position->heading() + _target_heading;
+		auto heading = _target_heading;
 
 		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
+		RCLCPP_INFO(_node.get_logger(), "Local position: %f, %f, %f", double(_vehicle_local_position->positionNed().x()), double(_vehicle_local_position->positionNed().y()),
+			    double(_vehicle_local_position->positionNed().z()));
 
-		// TODO: use land_detector or otherwise
-		// TODO: use a paramater
-		float kDeltaVelocity = 0.1;
-		auto velocity = _vehicle_local_position->velocityNed();
-		bool landed = velocity.norm() < kDeltaVelocity;
+		// This check is not ideal, sometimes it jumps to finsihed state before actually descending
+		// // TODO: use land_detector or otherwise
+		// // TODO: use a paramater
+		// float kDeltaVelocity = 0.1;
+		// auto velocity = _vehicle_local_position->velocityNed();
+		// bool landed = velocity.norm() < kDeltaVelocity;
 
-		if (landed) {
+		// if (landed) {
+		// 	_state = State::Finished;
+		// }
+		// Basic landing check
+		if (_vehicle_local_position->distanceGround() < 0.4) {
 			_state = State::Finished;
 		}
 
@@ -196,5 +263,6 @@ int main(int argc, char* argv[])
 	rclcpp::init(argc, argv);
 	rclcpp::spin(std::make_shared<px4_ros2::NodeWithMode<PrecisionLand>>(kModeName, kEnableDebugOutput));
 	rclcpp::shutdown();
+
 	return 0;
 }

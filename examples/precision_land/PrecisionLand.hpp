@@ -12,6 +12,13 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <cmath>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/quaternion.hpp>
+#include <kdl/frames.hpp>
+#include <tf2_kdl/tf2_kdl.hpp>
 
 class PrecisionLand : public px4_ros2::ModeBase
 {
@@ -54,4 +61,9 @@ private:
 	Eigen::Vector3f _align_position = {};
 
 	rclcpp::Time _last_target_timestamp;
+
+	geometry_msgs::msg::Pose _aruco_pose;
+	geometry_msgs::msg::Pose _camera_pose;
+	geometry_msgs::msg::Pose _drone_pose;
+
 };
