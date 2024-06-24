@@ -68,9 +68,11 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 				// NOTE: This calculate is derived from the pinhole camera model
 				// Real world size = (pixel size / focal length) * distance to object
 				// float pixel_width = cv::norm(corners[i][0] - corners[i][1]);
-				float pixel_width = cv::norm(undistortedCorners[i][0] - undistortedCorners[i][1]);
-				float focal_length = _camera_matrix.at<double>(0, 0);
-				float marker_size = (pixel_width / focal_length) * _distance_to_ground;
+				// float pixel_width = cv::norm(undistortedCorners[i][0] - undistortedCorners[i][1]);
+				// float focal_length = _camera_matrix.at<double>(0, 0);
+				// float marker_size = (pixel_width / focal_length) * _distance_to_ground;
+				// Marker sze in meters, the calculation above is not accurate
+				float marker_size = 0.5;
 				// RCLCPP_INFO(this->get_logger(), "pixel_width: %f", pixel_width);
 				// RCLCPP_INFO(this->get_logger(), "focal_length: %f", focal_length);
 				// RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);

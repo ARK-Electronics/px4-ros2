@@ -19,6 +19,7 @@
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <kdl/frames.hpp>
 #include <tf2_kdl/tf2_kdl.hpp>
+#include <vector>
 
 class PrecisionLand : public px4_ros2::ModeBase
 {
@@ -65,5 +66,13 @@ private:
 	geometry_msgs::msg::Pose _aruco_pose;
 	geometry_msgs::msg::Pose _camera_pose;
 	geometry_msgs::msg::Pose _drone_pose;
+
+	// Waypoints for Search pattern
+	std::vector<Eigen::Vector3f> _search_waypoints;
+	// Search pattern generation
+	void generateSearchWaypoints();
+	// Search pattern index
+	int _search_waypoint_index = 0;
+
 
 };

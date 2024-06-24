@@ -32,6 +32,40 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>("/target_pose",
 			   rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
 }
+void PrecisionLand::generateSearchWaypoints()
+{
+	// Generate paralelltrack search wayponts
+	// Probably during execution the PositionReached function could have a higher threshold to make the search faster
+	// The search waypoints are generated in the NED frame
+	// Parameters for the search pattern
+	double start_x = 0.0;
+	double start_y = 0.0;
+	double start_z = _vehicle_local_position->positionNed().z();
+	double width = 5.0;
+	double length = 20.0;
+	double spacing = 4.0;
+	bool reverse = false;
+	std::vector<Eigen::Vector3f> waypoints;
+
+	// Generate waypoints
+	for (double i = 0; i <= length; i += spacing) {
+		// Add waypoints in reverse order to make the drone fly in a zigzag pattern
+		if (reverse) {
+			waypoints.push_back(Eigen::Vector3f(start_x + i, start_y + width, start_z));
+			waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y + width, start_z));
+
+		} else {
+			waypoints.push_back(Eigen::Vector3f(start_x + i, start_y, start_z));
+			waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y, start_z));
+		}
+
+		reverse = !reverse;
+	}
+
+	// Reverse the waypoints to make the drone end the search at the starting point of the pattern
+	std::reverse(waypoints.begin(), waypoints.end());
+	_search_waypoints = waypoints;
+}
 
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
@@ -70,7 +104,7 @@ void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::Sh
 	Eigen::Quaternionf quat(R);
 	_camera_pose.position.x = 0;// camera case and camera position
 	_camera_pose.position.y = 0;// camera case and camera position
-	_camera_pose.position.z = 0;
+	_camera_pose.position.z = 0;// This is teh vertical shift, I think it can be tuned
 	_camera_pose.orientation.w = quat.w();
 	_camera_pose.orientation.x = quat.x();
 	_camera_pose.orientation.y = quat.y();
@@ -99,12 +133,13 @@ void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::Sh
 	// Convert to geometry_msgs::Pose
 	geometry_msgs::msg::Pose pose_aruco_in_world = tf2::toMsg(frame_aruco_world);
 
+	// Fetch the heading of the aruco in the world frame
 	auto q = Eigen::Quaternionf(pose_aruco_in_world.orientation.w, pose_aruco_in_world.orientation.x, pose_aruco_in_world.orientation.y, pose_aruco_in_world.orientation.z);
 	_target_heading = px4_ros2::quaternionToYaw(q);
 	// _last_target_timestamp = msg->header.stamp;
 
 
-
+	// Fetch the position of the aruco in the world frame
 	auto target_position = Eigen::Vector3f(pose_aruco_in_world.position.x, pose_aruco_in_world.position.y, pose_aruco_in_world.position.z);
 	_target_position = target_position;
 	RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
@@ -112,9 +147,13 @@ void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::Sh
 
 void PrecisionLand::onActivate()
 {
-	// _state = State::Search;
+	generateSearchWaypoints();
+	// Initialize _target_position with NaN values
+	_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
+	// Start in Search state
+	_state = State::Search;
 	// Skipping search for now, it was giving timesource errors
-	_state = State::Approach;
+	//_state = State::Approach;
 }
 
 void PrecisionLand::onDeactivate()
@@ -129,18 +168,40 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	case State::Search: {
 		RCLCPP_INFO(_node.get_logger(), "State::Search");
 
-		auto current_time = _node.get_clock()->now();
-		auto time_delta = rclcpp::Duration::from_seconds(0.2); // 200 milliseconds
+		// auto current_time = _node.get_clock()->now();
+		// auto time_delta = rclcpp::Duration::from_seconds(0.2); // 200 milliseconds
 
-		if ((current_time - _last_target_timestamp) > time_delta) {
-			// _state = State::Approach;
-			_state = State::AlignHeading;
-			_align_position = _vehicle_local_position->positionNed();
+		// if ((current_time - _last_target_timestamp) > time_delta) {
+		// 	// _state = State::Approach;
+		// 	_state = State::AlignHeading;
+		// 	_align_position = _vehicle_local_position->positionNed();
 
 
-			// TODO: configurable param in the case that target is not visible
-			// _approach_altitude = _vehicle_local_position->positionNed().z();
+		// 	// TODO: configurable param in the case that target is not visible
+		// 	// _approach_altitude = _vehicle_local_position->positionNed().z();
+		// }
+		// If the market has not been detected, search for it
+		if (std::isnan(_target_position.x())) {
+			RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
+			Eigen::Vector3f target_position = _search_waypoints[_search_waypoint_index];
+			// Go to the next waypoint
+			_goto_setpoint->update(target_position, _vehicle_local_position->heading());
+
+			if (positionReached(target_position)) {
+				_search_waypoint_index++;
+
+				// If we have searched all waypoints, start over
+				if (_search_waypoint_index >= static_cast<int>(_search_waypoints.size())) {
+					_search_waypoint_index = 0;
+				}
+			}
 		}
+
+		// If the marker has been detected Approach it
+		else {
+			_state = State::Approach;
+		}
+
 
 		break;
 	}
@@ -167,9 +228,10 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		auto target_x = _target_position.x();
 		auto target_y = _target_position.y();
+		_approach_altitude = _vehicle_local_position->positionNed().z();
 
 		auto position = Eigen::Vector3f(target_x, target_y, _approach_altitude);
-		_approach_altitude = _vehicle_local_position->positionNed().z();
+
 		// auto heading = _target_heading;
 		auto heading = _target_heading;
 
@@ -207,8 +269,11 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		auto heading = _target_heading;
 
 		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
+		// Logging the local and target position
 		RCLCPP_INFO(_node.get_logger(), "Local position: %f, %f, %f", double(_vehicle_local_position->positionNed().x()), double(_vehicle_local_position->positionNed().y()),
 			    double(_vehicle_local_position->positionNed().z()));
+		RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
+
 
 		// This check is not ideal, sometimes it jumps to finsihed state before actually descending
 		// // TODO: use land_detector or otherwise
@@ -221,7 +286,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		// 	_state = State::Finished;
 		// }
 		// Basic landing check
-		if (_vehicle_local_position->distanceGround() < 0.4) {
+		if (_vehicle_local_position->distanceGround() < 0.2) {
 			_state = State::Finished;
 		}
 
