@@ -164,7 +164,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
 		// TODO: use parameters
-		float max_h = 0.5;
+		float max_h = 5;
 		float max_v = 0.35;
 		float max_heading = 90.0_deg;
 
