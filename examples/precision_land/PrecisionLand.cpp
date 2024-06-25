@@ -22,6 +22,9 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	// Publish GoTo setpoint
 	_goto_setpoint = std::make_shared<px4_ros2::GotoSetpointType>(*this);
 
+	// Publish TrajectorySetpoint
+	_trajectory_setpoint = _node.create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", rclcpp::QoS(1).best_effort());
+
 	// Subscribe to VehicleLocalPosition
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
 
@@ -31,6 +34,18 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	// Subscribe to target_pose
 	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>("/target_pose",
 			   rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
+
+	// Subscribe to vehicle_land_detected
+	_vehicle_land_detected = _node.create_subscription<px4_msgs::msg::VehicleLandDetected>("/fmu/out/vehicle_land_detected",
+	rclcpp::QoS(1).best_effort(), [this](const px4_msgs::msg::VehicleLandDetected::SharedPtr msg) {
+		if (msg->landed) {
+			_land_detected = true;
+
+		} else {
+			_land_detected = false;
+		}
+	}
+											      );
 }
 
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
@@ -96,6 +111,7 @@ void PrecisionLand::onActivate()
 	generateSearchWaypoints();
 	// Initialize _target_position with NaN values
 	_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
+	RCLCPP_INFO(_node.get_logger(), "Switching to State::Search");
 	_state = State::Search;
 }
 
@@ -117,7 +133,18 @@ void PrecisionLand::updateSetpoint(float dt_s)
 			// RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
 			Eigen::Vector3f target_position = _search_waypoints[_search_waypoint_index];
 			// Go to the next waypoint
-			_goto_setpoint->update(target_position, _vehicle_local_position->heading());
+			// Publisher for trajectory setpoint
+			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+			_trajectory_setpoint_msg.position = {target_position.x(), target_position.y(), target_position.z()};
+			_trajectory_setpoint_msg.velocity = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.yaw = NAN;
+			_trajectory_setpoint_msg.yawspeed = NAN;
+			// Publish the trajectory setpoint
+			_trajectory_setpoint->publish(_trajectory_setpoint_msg);
+
+			// _goto_setpoint->update(target_position, _vehicle_local_position->heading());
 
 			if (positionReached(target_position)) {
 				_search_waypoint_index++;
@@ -142,9 +169,20 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		_approach_altitude = _vehicle_local_position->positionNed().z();
 
 		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), _approach_altitude);
-		auto heading = _target_heading;
+		// Publisher for trajectory setpoint
+		_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+		_trajectory_setpoint_msg.position = {position.x(), position.y(), _approach_altitude};
+		_trajectory_setpoint_msg.velocity = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.yaw = _target_heading;
+		_trajectory_setpoint_msg.yawspeed = NAN;
+		// Publish the trajectory setpoint
+		_trajectory_setpoint->publish(_trajectory_setpoint_msg);
 
-		_goto_setpoint->update(position, heading);
+		// auto heading = _target_heading;
+
+		// _goto_setpoint->update(position, heading);
 
 		// -- Check std::absf(Position - Target < Threshold) --> State Transition
 		if (positionReached(position)) {
@@ -164,23 +202,32 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
 		// TODO: use parameters
-		float max_h = 5;
-		float max_v = 0.35;
-		float max_heading = 90.0_deg;
+		// float max_h = 5;
+		// float max_v = 0.35;
+		// float max_heading = 90.0_deg;
 
 		// Z target one meter below ground
 		auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 10;
 		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), target_z);
 		auto heading = _target_heading;
 
-		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
+		// _goto_setpoint->update(position, heading, max_h, max_v, max_heading);
+		_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+		_trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
+		_trajectory_setpoint_msg.velocity = {NAN, NAN, 0.35};
+		_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.yaw = heading;
+		_trajectory_setpoint_msg.yawspeed = NAN;
+		// Publish the trajectory setpoint
+		_trajectory_setpoint->publish(_trajectory_setpoint_msg);
 
 		// TODO: use land_detector
 
-		// if (landed) {
-		// 	RCLCPP_INFO(_node.get_logger(), "Switching to State::Finished");
-		// 	_state = State::Finished;
-		// }
+		if (_land_detected) {
+			RCLCPP_INFO(_node.get_logger(), "Switching to State::Finished");
+			_state = State::Finished;
+		}
 
 		break;
 	}
@@ -202,8 +249,8 @@ void PrecisionLand::generateSearchWaypoints()
 	double start_y = 0.0;
 	double start_z = _vehicle_local_position->positionNed().z();
 	double width = 5.0;
-	double length = 20.0;
-	double spacing = 4.0;
+	double length = 10;
+	double spacing = 2.0;
 	bool reverse = false;
 	std::vector<Eigen::Vector3f> waypoints;
 

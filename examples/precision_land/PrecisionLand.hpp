@@ -9,6 +9,9 @@
 #include <px4_ros2/control/setpoint_types/goto.hpp>
 #include <px4_ros2/odometry/local_position.hpp>
 #include <px4_ros2/odometry/attitude.hpp>
+#include <px4_msgs/msg/trajectory_setpoint.hpp>
+#include <px4_msgs/msg/vehicle_land_detected.hpp>
+
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -46,6 +49,8 @@ private:
 	// ros2
 	rclcpp::Node& _node;
 	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _target_pose_sub;
+	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr _vehicle_land_detected;
+	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr _trajectory_setpoint;
 
 	// px4_ros2_cpp
 	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;
@@ -57,6 +62,8 @@ private:
 	Eigen::Vector3f _target_position = {};
 	float _target_heading = {};
 	float _approach_altitude = {};
+	// Trajectory setpoint
+	px4_msgs::msg::TrajectorySetpoint _trajectory_setpoint_msg;
 
 	rclcpp::Time _last_target_timestamp;
 
@@ -70,6 +77,8 @@ private:
 	void generateSearchWaypoints();
 	// Search pattern index
 	int _search_waypoint_index = 0;
+	// Land detection
+	bool _land_detected = false;
 
 
 };
