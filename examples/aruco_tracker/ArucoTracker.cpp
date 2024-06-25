@@ -68,11 +68,11 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 				// NOTE: This calculate is derived from the pinhole camera model
 				// Real world size = (pixel size / focal length) * distance to object
 				// float pixel_width = cv::norm(corners[i][0] - corners[i][1]);
-				// float pixel_width = cv::norm(undistortedCorners[i][0] - undistortedCorners[i][1]);
-				// float focal_length = _camera_matrix.at<double>(0, 0);
-				// float marker_size = (pixel_width / focal_length) * _distance_to_ground;
+				float pixel_width = cv::norm(undistortedCorners[i][0] - undistortedCorners[i][1]);
+				float focal_length = _camera_matrix.at<double>(0, 0);
+				float marker_size = (pixel_width / focal_length) * _distance_to_ground;
 				// Marker sze in meters, the calculation above is not accurate
-				float marker_size = 0.5;
+				// float marker_size = 0.5;
 				// RCLCPP_INFO(this->get_logger(), "pixel_width: %f", pixel_width);
 				// RCLCPP_INFO(this->get_logger(), "focal_length: %f", focal_length);
 				// RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
@@ -96,23 +96,9 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 					cv::aruco::drawAxis(cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec, marker_size);
 
 					// In OpenCV frame
-					double target_x = tvec[0];
-					double target_y = tvec[1];
-					double target_z = tvec[2];
-
-					std::ostringstream stream;
-					stream << std::fixed << std::setprecision(2);
-					stream << "X: "  << target_x << " Y: " << target_y << " Z: " << target_z;
-					std::string text_xyz = stream.str();
-
-					int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-					double fontScale = 1;
-					int thickness = 2;
-					int baseline = 0;
-					cv::Size textSize = cv::getTextSize(text_xyz, fontFace, fontScale, thickness, &baseline);
-					baseline += thickness;
-					cv::Point textOrg((cv_ptr->image.cols - textSize.width - 10), (cv_ptr->image.rows - 10));
-					cv::putText(cv_ptr->image, text_xyz, textOrg, fontFace, fontScale, cv::Scalar(0, 255, 255), thickness, 8);
+					_target[0] = tvec[0];
+					_target[1] = tvec[1];
+					_target[2] = tvec[2];
 
 					// RCLCPP_INFO(this->get_logger(), "tvec: [%f, %f, %f]", tvec[0], tvec[1], tvec[2]);
 					// RCLCPP_INFO(this->get_logger(), "rvec: [%f, %f, %f]", rvec[0], rvec[1], rvec[2]);
@@ -124,9 +110,9 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 
 					// Staying in camera frame, but shift the origin to the center of the marker
 					// Camera frame is RBU
-					target_pose.pose.position.x = target_x + half_size;
-					target_pose.pose.position.y = target_y - half_size;
-					target_pose.pose.position.z = target_z;
+					target_pose.pose.position.x = _target[0];
+					target_pose.pose.position.y = _target[1];
+					target_pose.pose.position.z = _target[2];
 					cv::Mat rot_mat;
 					cv::Rodrigues(rvec, rot_mat);
 					RCLCPP_DEBUG(this->get_logger(), "Rot mat type: %d, rows: %d, cols: %d", rot_mat.type(), rot_mat.rows, rot_mat.cols);
@@ -150,6 +136,8 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 		} else {
 			// RCLCPP_ERROR(this->get_logger(), "distance to ground is NAN");
 		}
+
+		annotate_image(cv_ptr);
 
 		// Publish image
 		cv_bridge::CvImage out_msg;
@@ -192,6 +180,24 @@ void ArucoTrackerNode::camera_info_callback(const sensor_msgs::msg::CameraInfo::
 	} else {
 		RCLCPP_INFO(this->get_logger(), "Updated camera intrinsics from camera_info topic.");
 	}
+}
+
+void ArucoTrackerNode::annotate_image(cv_bridge::CvImagePtr image)
+
+{
+	std::ostringstream stream;
+	stream << std::fixed << std::setprecision(2);
+	stream << "X: "  << _target[0] << " Y: " << _target[0]  << " Z: " << _target[0];
+	std::string text_xyz = stream.str();
+
+	int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+	double fontScale = 1;
+	int thickness = 2;
+	int baseline = 0;
+	cv::Size textSize = cv::getTextSize(text_xyz, fontFace, fontScale, thickness, &baseline);
+	baseline += thickness;
+	cv::Point textOrg((image->image.cols - textSize.width - 10), (image->image.rows - 10));
+	cv::putText(image->image, text_xyz, textOrg, fontFace, fontScale, cv::Scalar(0, 255, 255), thickness, 8);
 }
 
 int main(int argc, char** argv)

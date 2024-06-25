@@ -35,11 +35,9 @@ public:
 
 private:
 	bool positionReached(const Eigen::Vector3f& target) const;
-	bool headingReached(float target) const;
 
 	enum class State {
 		Search, 	// Searches for target -- TODO: optionally perform a search pattern
-		AlignHeading,
 		Approach, 	// Positioning over landing target while maintaining altitude
 		Descend, 	// Stay over landing target while descending
 		Finished
@@ -59,7 +57,6 @@ private:
 	Eigen::Vector3f _target_position = {};
 	float _target_heading = {};
 	float _approach_altitude = {};
-	Eigen::Vector3f _align_position = {};
 
 	rclcpp::Time _last_target_timestamp;
 

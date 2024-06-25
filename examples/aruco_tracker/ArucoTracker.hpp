@@ -1,3 +1,4 @@
+#include <array>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -19,6 +20,8 @@ private:
 	void vehicle_local_position_callback(const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg);
 	void camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg);
 
+	void annotate_image(cv_bridge::CvImagePtr image);
+
 	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr _image_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr _vehicle_local_position_sub;
 	rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr _camera_info_sub;
@@ -33,5 +36,6 @@ private:
 
 	float _distance_to_ground = {NAN};
 	float heading = {};
+	std::array<double, 3> _target;
 };
 
