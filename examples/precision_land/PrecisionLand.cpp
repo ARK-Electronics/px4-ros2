@@ -19,8 +19,6 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	: ModeBase(node, kModeName)
 	, _node(node)
 {
-	// Publish GoTo setpoint
-	_goto_setpoint = std::make_shared<px4_ros2::GotoSetpointType>(*this);
 
 	// Publish TrajectorySetpoint
 	_trajectory_setpoint = _node.create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", rclcpp::QoS(1).best_effort());
@@ -38,56 +36,57 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	// Subscribe to vehicle_land_detected
 	_vehicle_land_detected = _node.create_subscription<px4_msgs::msg::VehicleLandDetected>("/fmu/out/vehicle_land_detected",
 	rclcpp::QoS(1).best_effort(), [this](const px4_msgs::msg::VehicleLandDetected::SharedPtr msg) {
-		if (msg->landed) {
-			_land_detected = true;
-
-		} else {
-			_land_detected = false;
-		}
+		_land_detected = msg->landed;
 	}
 											      );
 }
 
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
+
+
 	// Aruco pose in camera frame
-	_aruco_pose.position.x = msg->pose.position.x;
-	_aruco_pose.position.y = msg->pose.position.y;
-	_aruco_pose.position.z = msg->pose.position.z;
-	_aruco_pose.orientation.w = msg->pose.orientation.w;
-	_aruco_pose.orientation.x = msg->pose.orientation.x;
-	_aruco_pose.orientation.y = msg->pose.orientation.y;
-	_aruco_pose.orientation.z = msg->pose.orientation.z;
+	geometry_msgs::msg::Pose aruco_pose;
+	aruco_pose.position.x = msg->pose.position.x;
+	aruco_pose.position.y = msg->pose.position.y;
+	aruco_pose.position.z = msg->pose.position.z;
+	aruco_pose.orientation.w = msg->pose.orientation.w;
+	aruco_pose.orientation.x = msg->pose.orientation.x;
+	aruco_pose.orientation.y = msg->pose.orientation.y;
+	aruco_pose.orientation.z = msg->pose.orientation.z;
+
 
 	// Camera pose in drone frame
+	geometry_msgs::msg::Pose camera_pose;
 	Eigen::Matrix3f R;
 	R << 0, -1, 0,
 	1, 0, 0,
 	0, 0, 1;
 	Eigen::Quaternionf quat(R);
-	_camera_pose.position.x = 0;// camera case and camera position
-	_camera_pose.position.y = 0;// camera case and camera position
-	_camera_pose.position.z = 0;// This is teh vertical shift, I think it can be tuned
-	_camera_pose.orientation.w = quat.w();
-	_camera_pose.orientation.x = quat.x();
-	_camera_pose.orientation.y = quat.y();
-	_camera_pose.orientation.z = quat.z();
+	camera_pose.position.x = 0;// camera case and camera position
+	camera_pose.position.y = 0;// camera case and camera position
+	camera_pose.position.z = 0;// camera case and camera position
+	camera_pose.orientation.w = quat.w();
+	camera_pose.orientation.x = quat.x();
+	camera_pose.orientation.y = quat.y();
+	camera_pose.orientation.z = quat.z();
 
 	// Drone pose in world frame
+	geometry_msgs::msg::Pose drone_pose;
 	auto vehicle_q = _vehicle_attitude->attitude();
-	_drone_pose.position.x = _vehicle_local_position->positionNed().x();
-	_drone_pose.position.y = _vehicle_local_position->positionNed().y();
-	_drone_pose.position.z = _vehicle_local_position->positionNed().z();
-	_drone_pose.orientation.w = vehicle_q.w();
-	_drone_pose.orientation.x = vehicle_q.x();
-	_drone_pose.orientation.y = vehicle_q.y();
-	_drone_pose.orientation.z = vehicle_q.z();
+	drone_pose.position.x = _vehicle_local_position->positionNed().x();
+	drone_pose.position.y = _vehicle_local_position->positionNed().y();
+	drone_pose.position.z = _vehicle_local_position->positionNed().z();
+	drone_pose.orientation.w = vehicle_q.w();
+	drone_pose.orientation.x = vehicle_q.x();
+	drone_pose.orientation.y = vehicle_q.y();
+	drone_pose.orientation.z = vehicle_q.z();
 
 	// Convert to KDL::Frame
 	KDL::Frame frame_drone, frame_camera, frame_aruco;
-	tf2::fromMsg(_drone_pose, frame_drone);
-	tf2::fromMsg(_camera_pose, frame_camera);
-	tf2::fromMsg(_aruco_pose, frame_aruco);
+	tf2::fromMsg(drone_pose, frame_drone);
+	tf2::fromMsg(camera_pose, frame_camera);
+	tf2::fromMsg(aruco_pose, frame_aruco);
 
 	// Calculate the pose of the aruco in the world frame
 	KDL::Frame frame_aruco_world = frame_drone * frame_camera * frame_aruco;
@@ -120,7 +119,6 @@ void PrecisionLand::onDeactivate()
 	// TODO:
 }
 
-// GoTo setpoint type has a default update rate of 30Hz
 void PrecisionLand::updateSetpoint(float dt_s)
 {
 	switch (_state) {
@@ -144,8 +142,8 @@ void PrecisionLand::updateSetpoint(float dt_s)
 			// Publish the trajectory setpoint
 			_trajectory_setpoint->publish(_trajectory_setpoint_msg);
 
-			// _goto_setpoint->update(target_position, _vehicle_local_position->heading());
 
+			// Check if the drone has reached the target position
 			if (positionReached(target_position)) {
 				_search_waypoint_index++;
 
@@ -156,7 +154,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 			}
 		}
 
-		// If the marker has been detected Approach it
+		// -- Check if the marker has been detected --> State Transition
 		else {
 			RCLCPP_INFO(_node.get_logger(), "Switching to State::Approach");
 			_state = State::Approach;
@@ -166,6 +164,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	}
 
 	case State::Approach: {
+		// Aproach the target position
 		_approach_altitude = _vehicle_local_position->positionNed().z();
 
 		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), _approach_altitude);
@@ -180,9 +179,6 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		// Publish the trajectory setpoint
 		_trajectory_setpoint->publish(_trajectory_setpoint_msg);
 
-		// auto heading = _target_heading;
-
-		// _goto_setpoint->update(position, heading);
 
 		// -- Check std::absf(Position - Target < Threshold) --> State Transition
 		if (positionReached(position)) {
@@ -200,18 +196,11 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// TODO: while in failsafe (normal land) keep checking conditions to switch back into precision land
 
-		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
-		// TODO: use parameters
-		// float max_h = 5;
-		// float max_v = 0.35;
-		// float max_heading = 90.0_deg;
-
 		// Z target one meter below ground
 		auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 10;
 		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), target_z);
 		auto heading = _target_heading;
 
-		// _goto_setpoint->update(position, heading, max_h, max_v, max_heading);
 		_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
 		_trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
 		_trajectory_setpoint_msg.velocity = {NAN, NAN, 0.35};
@@ -222,8 +211,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		// Publish the trajectory setpoint
 		_trajectory_setpoint->publish(_trajectory_setpoint_msg);
 
-		// TODO: use land_detector
-
+		// -- Check std::absf(Position - Target < Threshold) --> State Transition
 		if (_land_detected) {
 			RCLCPP_INFO(_node.get_logger(), "Switching to State::Finished");
 			_state = State::Finished;
@@ -242,15 +230,14 @@ void PrecisionLand::updateSetpoint(float dt_s)
 void PrecisionLand::generateSearchWaypoints()
 {
 	// Generate paralelltrack search wayponts
-	// Probably during execution the PositionReached function could have a higher threshold to make the search faster
 	// The search waypoints are generated in the NED frame
 	// Parameters for the search pattern
 	double start_x = 0.0;
 	double start_y = 0.0;
 	double start_z = _vehicle_local_position->positionNed().z();
 	double width = 5.0;
-	double length = 10;
-	double spacing = 2.0;
+	double length = 15;
+	double spacing = 3.0;
 	bool reverse = false;
 	std::vector<Eigen::Vector3f> waypoints;
 
@@ -276,7 +263,7 @@ void PrecisionLand::generateSearchWaypoints()
 
 bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
 {
-	// TODO: parameters for delta_position and delta_velocitry
+	// Parameters for delta_position and delta_velocitry
 	static constexpr float kDeltaPosition = 0.25f;
 	static constexpr float kDeltaVelocity = 0.25f;
 

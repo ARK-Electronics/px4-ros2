@@ -39,14 +39,15 @@ void ArucoTrackerNode::vehicle_local_position_callback(const px4_msgs::msg::Vehi
 
 	// TODO: why is dist_bottom_valid false in sim?
 	_distance_to_ground = msg->dist_bottom;
-	// RCLCPP_INFO(this->get_logger(), "dist_bottom: %f", msg->dist_bottom);
 }
 
 void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
 	try {
+		// Convert ROS image message to OpenCV image
 		cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
+		// Detect markers
 		std::vector<int> ids;
 		std::vector<std::vector<cv::Point2f>> corners;
 		cv::aruco::detectMarkers(cv_ptr->image, _dictionary, corners, ids);
@@ -67,21 +68,14 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 				// NOTE: This calculation assumes that the marker is perpendicular to the direction of the view of the camera
 				// NOTE: This calculate is derived from the pinhole camera model
 				// Real world size = (pixel size / focal length) * distance to object
-				// float pixel_width = cv::norm(corners[i][0] - corners[i][1]);
 				float pixel_width = cv::norm(undistortedCorners[i][0] - undistortedCorners[i][1]);
 				float focal_length = _camera_matrix.at<double>(0, 0);
-				float marker_size = (pixel_width / focal_length) * _distance_to_ground;
-				// Marker sze in meters, the calculation above is not accurate
-				// float marker_size = 0.5;
-				// RCLCPP_INFO(this->get_logger(), "pixel_width: %f", pixel_width);
-				// RCLCPP_INFO(this->get_logger(), "focal_length: %f", focal_length);
-				// RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
+				_marker_size = (pixel_width / focal_length) * _distance_to_ground;
 
-				if (!std::isnan(marker_size) && !std::isinf(marker_size) && marker_size > 0) {
+				if (!std::isnan(_marker_size) && !std::isinf(_marker_size) && _marker_size > 0) {
 
 					// Calculate marker size from camera intrinsics
-					// RCLCPP_INFO(this->get_logger(), "marker_size: %f", marker_size);
-					float half_size = marker_size / 2.0f;
+					float half_size = _marker_size / 2.0f;
 					std::vector<cv::Point3f> objectPoints = {
 						cv::Point3f(-half_size,  half_size, 0),  // top left
 						cv::Point3f(half_size,  half_size, 0),   // top right
@@ -89,26 +83,23 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 						cv::Point3f(-half_size, -half_size, 0)   // bottom left
 					};
 
-					// Use PnP solver (look it up!)
+					// Use PnP solver to estimate pose
 					cv::Vec3d rvec, tvec;
 					cv::solvePnP(objectPoints, undistortedCorners[i], _camera_matrix, cv::noArray(), rvec, tvec);
 					// Annotate the image
-					cv::aruco::drawAxis(cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec, marker_size);
+					cv::aruco::drawAxis(cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec, _marker_size);
 
 					// In OpenCV frame
 					_target[0] = tvec[0];
 					_target[1] = tvec[1];
 					_target[2] = tvec[2];
 
-					// RCLCPP_INFO(this->get_logger(), "tvec: [%f, %f, %f]", tvec[0], tvec[1], tvec[2]);
-					// RCLCPP_INFO(this->get_logger(), "rvec: [%f, %f, %f]", rvec[0], rvec[1], rvec[2]);
 
 					// Publish target pose
 					geometry_msgs::msg::PoseStamped target_pose;
 					target_pose.header.stamp = msg->header.stamp;
 					target_pose.header.frame_id = "camera_frame"; // TODO: frame_id
 
-					// Staying in camera frame, but shift the origin to the center of the marker
 					// Camera frame is RBU
 					target_pose.pose.position.x = _target[0];
 					target_pose.pose.position.y = _target[1];
@@ -117,7 +108,7 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 					cv::Rodrigues(rvec, rot_mat);
 					RCLCPP_DEBUG(this->get_logger(), "Rot mat type: %d, rows: %d, cols: %d", rot_mat.type(), rot_mat.rows, rot_mat.cols);
 
-					// TODO: why is the rotation matrix sometimes malformed?
+					// Quaternion from rotation matrix
 					if (rot_mat.type() == CV_64FC1 && rot_mat.rows == 3 && rot_mat.cols == 3) {
 						cv::Quatd quat = cv::Quatd::createFromRotMat(rot_mat).normalize();
 						target_pose.pose.orientation.x = quat.x;
@@ -128,7 +119,7 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 						_target_pose_pub->publish(target_pose);
 
 					} else {
-						RCLCPP_ERROR(this->get_logger(), "rotation matrix malformed!");
+						RCLCPP_ERROR(this->get_logger(), "Rotation matrix malformed!");
 					}
 				}
 			}
@@ -137,6 +128,7 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 			// RCLCPP_ERROR(this->get_logger(), "distance to ground is NAN");
 		}
 
+		// Annotate the image
 		annotate_image(cv_ptr);
 
 		// Publish image
@@ -185,10 +177,12 @@ void ArucoTrackerNode::camera_info_callback(const sensor_msgs::msg::CameraInfo::
 void ArucoTrackerNode::annotate_image(cv_bridge::CvImagePtr image)
 
 {
+	// Annotate the image with the target position and marker size
 	std::ostringstream stream;
 	stream << std::fixed << std::setprecision(2);
-	stream << "X: "  << _target[0] << " Y: " << _target[0]  << " Z: " << _target[0];
+	stream << "X: "  << _target[0] << " Y: " << _target[1]  << " Z: " << _target[2] << " Marker size: " << _marker_size << " x " << _marker_size << " m ";
 	std::string text_xyz = stream.str();
+
 
 	int fontFace = cv::FONT_HERSHEY_SIMPLEX;
 	double fontScale = 1;
