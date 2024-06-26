@@ -35,6 +35,9 @@ public:
 		const std::optional<Eigen::Vector3f>& acceleration_ned_m_s2 = {},
 		std::optional<float> yaw_ned_rad = {},
 		std::optional<float> yaw_rate_ned_rad_s = {});
+		
+	// Overloaded update function to handle a TrajectorySetpoint
+    void update(const px4_msgs::msg::TrajectorySetpoint& setpoint);
 
 private:
 	rclcpp::Node& _node;

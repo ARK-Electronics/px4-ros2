@@ -10,6 +10,7 @@
 #include <px4_ros2/odometry/attitude.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_land_detected.hpp>
+#include <px4_ros2/control/setpoint_types/experimental/trajectory.hpp>
 
 
 #include <rclcpp/rclcpp.hpp>
@@ -49,11 +50,11 @@ private:
 	rclcpp::Node& _node;
 	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _target_pose_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr _vehicle_land_detected;
-	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr _trajectory_setpoint;
 
 	// px4_ros2_cpp
 	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;
 	std::shared_ptr<px4_ros2::OdometryAttitude> _vehicle_attitude;
+	std::shared_ptr<px4_ros2::TrajectorySetpointType> _trajectory_setpoint;
 
 	// Data
 	State _state = State::Search;

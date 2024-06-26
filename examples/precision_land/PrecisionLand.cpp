@@ -21,7 +21,7 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 {
 
 	// Publish TrajectorySetpoint
-	_trajectory_setpoint = _node.create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", rclcpp::QoS(1).best_effort());
+	_trajectory_setpoint = std::make_shared<px4_ros2::TrajectorySetpointType>(*this);
 
 	// Subscribe to VehicleLocalPosition
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
@@ -140,7 +140,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 			_trajectory_setpoint_msg.yaw = NAN;
 			_trajectory_setpoint_msg.yawspeed = NAN;
 			// Publish the trajectory setpoint
-			_trajectory_setpoint->publish(_trajectory_setpoint_msg);
+			_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
 
 			// Check if the drone has reached the target position
@@ -177,7 +177,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		_trajectory_setpoint_msg.yaw = _target_heading;
 		_trajectory_setpoint_msg.yawspeed = NAN;
 		// Publish the trajectory setpoint
-		_trajectory_setpoint->publish(_trajectory_setpoint_msg);
+		_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
 
 		// -- Check std::absf(Position - Target < Threshold) --> State Transition
@@ -209,7 +209,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		_trajectory_setpoint_msg.yaw = heading;
 		_trajectory_setpoint_msg.yawspeed = NAN;
 		// Publish the trajectory setpoint
-		_trajectory_setpoint->publish(_trajectory_setpoint_msg);
+		_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
 		// -- Check std::absf(Position - Target < Threshold) --> State Transition
 		if (_land_detected) {
