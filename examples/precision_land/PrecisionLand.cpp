@@ -12,12 +12,14 @@
 
 static const std::string kModeName = "PrecisionLandCustom";
 static const bool kEnableDebugOutput = true;
+static const std::string kTopicNamespacePrefix = "/px4_1/";
 
 using namespace px4_ros2::literals;
 
-PrecisionLand::PrecisionLand(rclcpp::Node& node)
+PrecisionLand::PrecisionLand(rclcpp::Node& node, const std::string& topic_namespace_prefix)
 	: ModeBase(node, kModeName)
 	, _node(node)
+	, _topic_namespace_prefix(topic_namespace_prefix)
 {
 
 	// Publish TrajectorySetpoint
@@ -278,7 +280,7 @@ bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
 int main(int argc, char* argv[])
 {
 	rclcpp::init(argc, argv);
-	rclcpp::spin(std::make_shared<px4_ros2::NodeWithMode<PrecisionLand>>(kModeName, kEnableDebugOutput));
+	rclcpp::spin(std::make_shared<px4_ros2::NodeWithMode<PrecisionLand>>(kModeName, kEnableDebugOutput, kTopicNamespacePrefix));
 	rclcpp::shutdown();
 
 	return 0;
