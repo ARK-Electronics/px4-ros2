@@ -35,7 +35,7 @@ private:
 	// Data
 	// cv::Ptr<cv::aruco::Dictionary> _dictionary;
 
-	std::unique_ptr<cv::aruco::ArucoDetector> detector;
+	std::unique_ptr<cv::aruco::ArucoDetector> _detector;
 	cv::Mat _camera_matrix;
 	cv::Mat _dist_coeffs;
 
