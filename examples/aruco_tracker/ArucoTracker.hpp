@@ -33,7 +33,9 @@ private:
 	rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr _target_pose_pub;
 
 	// Data
-	cv::Ptr<cv::aruco::Dictionary> _dictionary;
+	// cv::Ptr<cv::aruco::Dictionary> _dictionary;
+
+	std::unique_ptr<cv::aruco::ArucoDetector> detector;
 	cv::Mat _camera_matrix;
 	cv::Mat _dist_coeffs;
 

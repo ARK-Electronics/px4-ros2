@@ -7,7 +7,12 @@ ArucoTrackerNode::ArucoTrackerNode()
 	RCLCPP_INFO(this->get_logger(), "Starting ArucoTrackerNode");
 
 	// Define aruco tag dictionary to use
-	_dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+	// _dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+
+	cv::aruco::DetectorParameters detectorParams = cv::aruco::DetectorParameters();
+	cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+	_detector = std::make_unique<cv::aruco::ArucoDetector>(dictionary, detectorParams);
+// cv::aruco::ArucoDetector detector(dictionary, detectorParams);
 
 	// RMW QoS settings
 	auto qos = rclcpp::QoS(1).best_effort();
@@ -50,7 +55,7 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 		// Detect markers
 		std::vector<int> ids;
 		std::vector<std::vector<cv::Point2f>> corners;
-		cv::aruco::detectMarkers(cv_ptr->image, _dictionary, corners, ids);
+		_detector->detectMarkers(cv_ptr->image, _dictionary, corners, ids);
 		cv::aruco::drawDetectedMarkers(cv_ptr->image, corners, ids);
 
 		if (!_camera_matrix.empty() && !_dist_coeffs.empty() && !std::isnan(_distance_to_ground)) {
