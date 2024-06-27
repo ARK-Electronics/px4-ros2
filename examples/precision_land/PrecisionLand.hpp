@@ -50,8 +50,6 @@ private:
 	rclcpp::Node& _node;
 	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _target_pose_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr _vehicle_land_detected;
-	// Topic namespace prefix
-	std::string _topic_namespace_prefix;
 
 	// px4_ros2_cpp
 	std::shared_ptr<px4_ros2::OdometryLocalPosition> _vehicle_local_position;

@@ -17,9 +17,8 @@ static const std::string kTopicNamespacePrefix = "/px4_1/";
 using namespace px4_ros2::literals;
 
 PrecisionLand::PrecisionLand(rclcpp::Node& node, const std::string& topic_namespace_prefix)
-	: ModeBase(node, kModeName)
+	: ModeBase(node, kModeName,topic_namespace_prefix)
 	, _node(node)
-	, _topic_namespace_prefix(topic_namespace_prefix)
 {
 
 	// Publish TrajectorySetpoint
