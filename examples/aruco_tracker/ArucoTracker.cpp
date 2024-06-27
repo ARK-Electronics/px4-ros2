@@ -87,7 +87,7 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 					cv::Vec3d rvec, tvec;
 					cv::solvePnP(objectPoints, undistortedCorners[i], _camera_matrix, cv::noArray(), rvec, tvec);
 					// Annotate the image
-					cv::aruco::drawFrameAxes(cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec, _marker_size);
+					cv::drawFrameAxes(cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec, _marker_size);
 
 					// In OpenCV frame
 					_target[0] = tvec[0];
