@@ -2,6 +2,17 @@ Launch PX4 sim
 ```
 make px4_sitl_default gz_x500_mono_cam_down
 ```
+OR for multiple vehicle
+```
+PX4_SYS_AUTOSTART=4001 PX4_SIM_MODEL=x500_mono_cam_down ./build/px4_sitl_default/bin/px4 -i 1
+
+```
+AND
+```
+PX4_SYS_AUTOSTART=4001 PX4_GZ_MODEL_POSE="0,1" PX4_SIM_MODEL=lawnmower_aruco ./build/px4_sitl_default/bin/px4 -i 2
+
+```
+
 Launch micro dds
 ```
 MicroXRCEAgent udp4 -p 8888

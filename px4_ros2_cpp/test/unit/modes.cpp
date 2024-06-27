@@ -15,8 +15,8 @@
 class TestMode : public px4_ros2::ModeBase
 {
 public:
-	explicit TestMode(rclcpp::Node& node)
-		: ModeBase(node, std::string("test"))
+	explicit TestMode(rclcpp::Node& node, const std::string& topic_namespace_prefix = "")
+        : ModeBase(node, px4_ros2::ModeBase::Settings("test"), topic_namespace_prefix)
 	{
 		EXPECT_FALSE(modeRequirements().manual_control);
 		EXPECT_FALSE(modeRequirements().angular_velocity);

@@ -12,50 +12,106 @@
 
 static const std::string kModeName = "PrecisionLandCustom";
 static const bool kEnableDebugOutput = true;
+static const std::string kTopicNamespacePrefix = "/px4_1/";
 
 using namespace px4_ros2::literals;
 
-PrecisionLand::PrecisionLand(rclcpp::Node& node)
-	: ModeBase(node, kModeName)
+PrecisionLand::PrecisionLand(rclcpp::Node& node, const std::string& topic_namespace_prefix)
+	: ModeBase(node, kModeName,topic_namespace_prefix)
 	, _node(node)
 {
-	// Publish GoTo setpoint
-	_goto_setpoint = std::make_shared<px4_ros2::GotoSetpointType>(*this);
+
+	// Publish TrajectorySetpoint
+	_trajectory_setpoint = std::make_shared<px4_ros2::TrajectorySetpointType>(*this);
 
 	// Subscribe to VehicleLocalPosition
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
 
 	// Subscribe to VehicleAttitude
-	_vehicle_attitude= std::make_shared<px4_ros2::OdometryAttitude>(*this);
+	_vehicle_attitude = std::make_shared<px4_ros2::OdometryAttitude>(*this);
 
 	// Subscribe to target_pose
 	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>("/target_pose",
 			   rclcpp::QoS(1).best_effort(), std::bind(&PrecisionLand::targetPoseCallback, this, std::placeholders::_1));
+
+	// Subscribe to vehicle_land_detected
+	_vehicle_land_detected = _node.create_subscription<px4_msgs::msg::VehicleLandDetected>("/fmu/out/vehicle_land_detected",
+	rclcpp::QoS(1).best_effort(), [this](const px4_msgs::msg::VehicleLandDetected::SharedPtr msg) {
+		_land_detected = msg->landed;
+	}
+											      );
 }
 
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
-	auto q = Eigen::Quaternionf(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
-	_target_heading = px4_ros2::quaternionToYaw(q);
-	_last_target_timestamp = msg->header.stamp;
 
+
+	// Aruco pose in camera frame
+	geometry_msgs::msg::Pose aruco_pose;
+	aruco_pose.position.x = msg->pose.position.x;
+	aruco_pose.position.y = msg->pose.position.y;
+	aruco_pose.position.z = msg->pose.position.z;
+	aruco_pose.orientation.w = msg->pose.orientation.w;
+	aruco_pose.orientation.x = msg->pose.orientation.x;
+	aruco_pose.orientation.y = msg->pose.orientation.y;
+	aruco_pose.orientation.z = msg->pose.orientation.z;
+
+
+	// Camera pose in drone frame
+	geometry_msgs::msg::Pose camera_pose;
+	Eigen::Matrix3f R;
+	R << 0, -1, 0,
+	1, 0, 0,
+	0, 0, 1;
+	Eigen::Quaternionf quat(R);
+	camera_pose.position.x = 0;// camera case and camera position
+	camera_pose.position.y = 0;// camera case and camera position
+	camera_pose.position.z = 0;// camera case and camera position
+	camera_pose.orientation.w = quat.w();
+	camera_pose.orientation.x = quat.x();
+	camera_pose.orientation.y = quat.y();
+	camera_pose.orientation.z = quat.z();
+
+	// Drone pose in world frame
+	geometry_msgs::msg::Pose drone_pose;
 	auto vehicle_q = _vehicle_attitude->attitude();
+	drone_pose.position.x = _vehicle_local_position->positionNed().x();
+	drone_pose.position.y = _vehicle_local_position->positionNed().y();
+	drone_pose.position.z = _vehicle_local_position->positionNed().z();
+	drone_pose.orientation.w = vehicle_q.w();
+	drone_pose.orientation.x = vehicle_q.x();
+	drone_pose.orientation.y = vehicle_q.y();
+	drone_pose.orientation.z = vehicle_q.z();
 
-	(void)vehicle_q;
+	// Convert to KDL::Frame
+	KDL::Frame frame_drone, frame_camera, frame_aruco;
+	tf2::fromMsg(drone_pose, frame_drone);
+	tf2::fromMsg(camera_pose, frame_camera);
+	tf2::fromMsg(aruco_pose, frame_aruco);
 
-    // Fetch vehicle's current heading (yaw)
-    float vehicle_heading = _vehicle_local_position->heading();  // Placeholder for your method to get the heading
+	// Calculate the pose of the aruco in the world frame
+	KDL::Frame frame_aruco_world = frame_drone * frame_camera * frame_aruco;
 
-	// TODO: rotate the XYZ into world frame
-    Eigen::Matrix3f rotation_matrix;
-    rotation_matrix = Eigen::AngleAxisf(vehicle_heading, Eigen::Vector3f::UnitZ());
+	// Convert to geometry_msgs::Pose
+	geometry_msgs::msg::Pose pose_aruco_in_world = tf2::toMsg(frame_aruco_world);
 
-    auto target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-    _target_position = rotation_matrix * target_position;
+	// Fetch the heading of the aruco in the world frame
+	auto q = Eigen::Quaternionf(pose_aruco_in_world.orientation.w, pose_aruco_in_world.orientation.x, pose_aruco_in_world.orientation.y, pose_aruco_in_world.orientation.z);
+	_target_heading = px4_ros2::quaternionToYaw(q);
+
+	// Fetch the position of the aruco in the world frame
+	auto target_position = Eigen::Vector3f(pose_aruco_in_world.position.x, pose_aruco_in_world.position.y, pose_aruco_in_world.position.z);
+	_target_position = target_position;
+
+	_last_target_timestamp = msg->header.stamp;
 }
 
 void PrecisionLand::onActivate()
 {
+	generateSearchWaypoints();
+	// Initialize _target_position with NaN values
+	_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
+	RCLCPP_INFO(_node.get_logger(), "Switching to State::Search");
 	_state = State::Search;
 }
 
@@ -64,59 +120,70 @@ void PrecisionLand::onDeactivate()
 	// TODO:
 }
 
-// GoTo setpoint type has a default update rate of 30Hz
 void PrecisionLand::updateSetpoint(float dt_s)
 {
 	switch (_state) {
 	case State::Search: {
-		RCLCPP_INFO(_node.get_logger(), "State::Search");
 
-		auto current_time = _node.get_clock()->now();
-		auto time_delta = rclcpp::Duration::from_seconds(0.2); // 200 milliseconds
+		// TODO: logic should use timestamp to detect stale data.
 
-		if ((current_time - _last_target_timestamp) > time_delta) {
-			// _state = State::Approach;
-			_state = State::AlignHeading;
-			_align_position = _vehicle_local_position->positionNed();
+		// If the market has not been detected, search for it
+		if (std::isnan(_target_position.x())) {
+			// RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
+			Eigen::Vector3f target_position = _search_waypoints[_search_waypoint_index];
+			// Go to the next waypoint
+			// Publisher for trajectory setpoint
+			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+			_trajectory_setpoint_msg.position = {target_position.x(), target_position.y(), target_position.z()};
+			_trajectory_setpoint_msg.velocity = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.yaw = NAN;
+			_trajectory_setpoint_msg.yawspeed = NAN;
+			// Publish the trajectory setpoint
+			_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
 
-			// TODO: configurable param in the case that target is not visible
-			// _approach_altitude = _vehicle_local_position->positionNed().z();
+			// Check if the drone has reached the target position
+			if (positionReached(target_position)) {
+				_search_waypoint_index++;
+
+				// If we have searched all waypoints, start over
+				if (_search_waypoint_index >= static_cast<int>(_search_waypoints.size())) {
+					_search_waypoint_index = 0;
+				}
+			}
 		}
 
-		break;
-	}
-
-	case State::AlignHeading: {
-		RCLCPP_INFO(_node.get_logger(), "State::AlignHeading");
-		RCLCPP_INFO(_node.get_logger(), "current_heading: %f", double(_vehicle_local_position->heading()));
-		RCLCPP_INFO(_node.get_logger(), "target_heading: %f", double(_target_heading));
-
-
-		auto heading_setpoint = _vehicle_local_position->heading() + _target_heading;
-		_goto_setpoint->update(_align_position, heading_setpoint);
-
-		if (headingReached(heading_setpoint)) {
-			_approach_altitude = _vehicle_local_position->positionNed().z();
+		// -- Check if the marker has been detected --> State Transition
+		else {
+			RCLCPP_INFO(_node.get_logger(), "Switching to State::Approach");
 			_state = State::Approach;
 		}
+
 		break;
 	}
 
 	case State::Approach: {
-		RCLCPP_INFO(_node.get_logger(), "State::Approach");
+		// Aproach the target position
+		_approach_altitude = _vehicle_local_position->positionNed().z();
 
-		auto target_x = _vehicle_local_position->positionNed().x() + _target_position.x();
-		auto target_y = _vehicle_local_position->positionNed().y() + _target_position.y();
+		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), _approach_altitude);
+		// Publisher for trajectory setpoint
+		_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+		_trajectory_setpoint_msg.position = {position.x(), position.y(), _approach_altitude};
+		_trajectory_setpoint_msg.velocity = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.yaw = _target_heading;
+		_trajectory_setpoint_msg.yawspeed = NAN;
+		// Publish the trajectory setpoint
+		_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
-		auto position = Eigen::Vector3f(target_x, target_y, _approach_altitude);
-		// auto heading = _target_heading;
-		auto heading = _vehicle_local_position->heading() + _target_heading;
-
-		_goto_setpoint->update(position, heading);
 
 		// -- Check std::absf(Position - Target < Threshold) --> State Transition
 		if (positionReached(position)) {
+			RCLCPP_INFO(_node.get_logger(), "Switching to State::Descend");
 			_state = State::Descend;
 		}
 
@@ -124,37 +191,30 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	}
 
 	case State::Descend: {
-		RCLCPP_INFO(_node.get_logger(), "State::Descend");
-
 		// TODO: check if distance to bottom is still valid
 		// - if invalid stop
 		// - start timeout, switch to failsafe if timed out : failsafe = normal land
 
 		// TODO: while in failsafe (normal land) keep checking conditions to switch back into precision land
 
-		// TODO: Z setpoint very large (thru ground).. rewrite to use direct position_setpoint instead of GoTo type
-		// TODO: use parameters
-		float max_h = 0.25;
-		float max_v = 0.25;
-		float max_heading = 90.0_deg;
 		// Z target one meter below ground
-		auto target_x = _vehicle_local_position->positionNed().x() + _target_position.x();
-		auto target_y = _vehicle_local_position->positionNed().y() + _target_position.y();
-		auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 1;
+		auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 10;
+		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), target_z);
+		auto heading = _target_heading;
 
-		auto position = Eigen::Vector3f(target_x, target_y, target_z);
-		// auto heading = _target_heading;
-		auto heading = _vehicle_local_position->heading() + _target_heading;
+		_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+		_trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
+		_trajectory_setpoint_msg.velocity = {NAN, NAN, 0.35};
+		_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+		_trajectory_setpoint_msg.yaw = heading;
+		_trajectory_setpoint_msg.yawspeed = NAN;
+		// Publish the trajectory setpoint
+		_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
-		_goto_setpoint->update(position, heading, max_h, max_v, max_heading);
-
-		// TODO: use land_detector or otherwise
-		// TODO: use a paramater
-		float kDeltaVelocity = 0.1;
-		auto velocity = _vehicle_local_position->velocityNed();
-		bool landed = velocity.norm() < kDeltaVelocity;
-
-		if (landed) {
+		// -- Check std::absf(Position - Target < Threshold) --> State Transition
+		if (_land_detected) {
+			RCLCPP_INFO(_node.get_logger(), "Switching to State::Finished");
 			_state = State::Finished;
 		}
 
@@ -162,16 +222,49 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	}
 
 	case State::Finished: {
-		RCLCPP_INFO(_node.get_logger(), "State::Finished");
 		ModeBase::completed(px4_ros2::Result::Success);
 		break;
 	}
 	} // end switch/case
 }
 
+void PrecisionLand::generateSearchWaypoints()
+{
+	// Generate paralelltrack search wayponts
+	// The search waypoints are generated in the NED frame
+	// Parameters for the search pattern
+	double start_x = 0.0;
+	double start_y = 0.0;
+	double start_z = _vehicle_local_position->positionNed().z();
+	double width = 5.0;
+	double length = 15;
+	double spacing = 3.0;
+	bool reverse = false;
+	std::vector<Eigen::Vector3f> waypoints;
+
+	// Generate waypoints
+	for (double i = 0; i <= length; i += spacing) {
+		// Add waypoints in reverse order to make the drone fly in a zigzag pattern
+		if (reverse) {
+			waypoints.push_back(Eigen::Vector3f(start_x + i, start_y + width, start_z));
+			waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y + width, start_z));
+
+		} else {
+			waypoints.push_back(Eigen::Vector3f(start_x + i, start_y, start_z));
+			waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y, start_z));
+		}
+
+		reverse = !reverse;
+	}
+
+	// Reverse the waypoints to make the drone end the search at the starting point of the pattern
+	std::reverse(waypoints.begin(), waypoints.end());
+	_search_waypoints = waypoints;
+}
+
 bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
 {
-	// TODO: parameters for delta_position and delta_velocitry
+	// Parameters for delta_position and delta_velocitry
 	static constexpr float kDeltaPosition = 0.25f;
 	static constexpr float kDeltaVelocity = 0.25f;
 
@@ -183,18 +276,11 @@ bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
 	return (delta_pos.norm() < kDeltaPosition) && (velocity.norm() < kDeltaVelocity);
 }
 
-bool PrecisionLand::headingReached(float target) const
-{
-	// TODO: parameter for delta heading
-	static constexpr float kDeltaHeading = 10.0_deg;
-	float heading = _vehicle_local_position->heading();
-	return fabsf(px4_ros2::wrapPi(target - heading)) < kDeltaHeading;
-}
-
 int main(int argc, char* argv[])
 {
 	rclcpp::init(argc, argv);
-	rclcpp::spin(std::make_shared<px4_ros2::NodeWithMode<PrecisionLand>>(kModeName, kEnableDebugOutput));
+	rclcpp::spin(std::make_shared<px4_ros2::NodeWithMode<PrecisionLand>>(kModeName, kEnableDebugOutput, kTopicNamespacePrefix));
 	rclcpp::shutdown();
+
 	return 0;
 }

@@ -10,12 +10,16 @@ find_package(Eigen3 REQUIRED)
 
 find_package(px4_ros2 REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(orocos_kdl REQUIRED)
+find_package(tf2_kdl REQUIRED)
 
 include_directories(${Eigen3_INCLUDE_DIRS})
 
 add_executable(precision_land PrecisionLand.cpp)
 
-ament_target_dependencies(precision_land rclcpp Eigen3 px4_ros2 geometry_msgs)
+ament_target_dependencies(precision_land rclcpp Eigen3 px4_ros2 geometry_msgs tf2_ros tf2 orocos_kdl tf2_kdl)
 
 target_compile_features(precision_land PUBLIC c_std_99 cxx_std_17)
 

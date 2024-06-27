@@ -13,7 +13,7 @@ TrajectorySetpointType::TrajectorySetpointType(Context& context)
 	: SetpointBase(context), _node(context.node())
 {
 	_trajectory_setpoint_pub = context.node().create_publisher<px4_msgs::msg::TrajectorySetpoint>(
-					   context.topicNamespacePrefix() + "/fmu/in/trajectory_setpoint", 1);
+					   context.topicNamespacePrefix() + "fmu/in/trajectory_setpoint", 1);
 }
 
 void TrajectorySetpointType::update(
@@ -41,6 +41,16 @@ void TrajectorySetpointType::update(
 	_trajectory_setpoint_pub->publish(sp);
 
 }
+void TrajectorySetpointType::update(const px4_msgs::msg::TrajectorySetpoint& setpoint)
+{
+    onUpdate();
+
+    // Publish the trajectory setpoint
+    _trajectory_setpoint_pub->publish(setpoint);
+	
+}
+
+
 
 SetpointBase::Configuration TrajectorySetpointType::getConfiguration()
 {

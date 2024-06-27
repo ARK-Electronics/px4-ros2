@@ -36,7 +36,7 @@ class NodeWithMode : public rclcpp::Node
 		"Template type ModeT must be derived from px4_ros2::ModeBase");
 
 public:
-	explicit NodeWithMode(std::string node_name, bool enable_debug_output = false)
+	explicit NodeWithMode(std::string node_name, bool enable_debug_output = false, const std::string &topic_namespace_prefix = "")
 		: Node(node_name)
 	{
 		if (enable_debug_output) {
@@ -49,7 +49,7 @@ public:
 			}
 		}
 
-		_mode = std::make_unique<ModeT>(*this);
+		_mode = std::make_unique<ModeT>(*this, topic_namespace_prefix);
 
 		if (!_mode->doRegister()) {
 			throw std::runtime_error("Registration failed");
@@ -94,7 +94,7 @@ class NodeWithModeExecutor : public rclcpp::Node
 		"Template type ModeT must be derived from px4_ros2::ModeBase");
 
 public:
-	explicit NodeWithModeExecutor(std::string node_name, bool enable_debug_output = false)
+	explicit NodeWithModeExecutor(std::string node_name, bool enable_debug_output = false, const std::string &topic_namespace_prefix = "")
 		: Node(node_name)
 	{
 		if (enable_debug_output) {
@@ -107,7 +107,7 @@ public:
 			}
 		}
 
-		_mode = std::make_unique<ModeT>(*this);
+		_mode = std::make_unique<ModeT>(*this,topic_namespace_prefix);
 		_mode_executor = std::make_unique<ModeExecutorT>(*this, *_mode);
 
 		if (!_mode_executor->doRegister()) {
