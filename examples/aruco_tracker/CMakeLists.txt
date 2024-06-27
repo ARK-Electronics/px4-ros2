@@ -12,6 +12,8 @@ find_package(px4_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
+
+# NOTE: we build opencv from source, hence the path /usr/local/lib
 find_package(OpenCV REQUIRED PATHS /usr/local NO_DEFAULT_PATH)
 
 include_directories(${Eigen3_INCLUDE_DIRS})
