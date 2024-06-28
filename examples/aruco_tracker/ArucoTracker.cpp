@@ -17,7 +17,7 @@ ArucoTrackerNode::ArucoTrackerNode()
 			     "/camera", qos, std::bind(&ArucoTrackerNode::image_callback, this, std::placeholders::_1));
 
 	_vehicle_local_position_sub = this->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-					      "/fmu/out/vehicle_local_position", qos, std::bind(&ArucoTrackerNode::vehicle_local_position_callback, this, std::placeholders::_1));
+					      "/px4_1/fmu/out/vehicle_local_position", qos, std::bind(&ArucoTrackerNode::vehicle_local_position_callback, this, std::placeholders::_1));
 
 	_camera_info_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
 				   "/camera_info", qos, std::bind(&ArucoTrackerNode::camera_info_callback, this, std::placeholders::_1));
