@@ -1,5 +1,6 @@
 # Created by https://www.toptal.com/developers/gitignore/api/c++,meson,sonar,python,sonarqube,visualstudiocode,clion
 # Edit at https://www.toptal.com/developers/gitignore?templates=c++,meson,sonar,python,sonarqube,visualstudiocode,clion
+**/.vscode/
 
 ### C++ ###
 # Prerequisites

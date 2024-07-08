@@ -12,7 +12,7 @@
 
 static const std::string kModeName = "PrecisionLandCustom";
 static const bool kEnableDebugOutput = true;
-static const std::string kTopicNamespacePrefix = "/px4_1/";
+static const std::string kTopicNamespacePrefix = "";
 
 using namespace px4_ros2::literals;
 
@@ -112,6 +112,10 @@ void PrecisionLand::onActivate()
 	// Initialize _target_position with NaN values
 	_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
 	RCLCPP_INFO(_node.get_logger(), "Switching to State::Search");
+	// Print the search waypoints
+	// for (auto& waypoint : _search_waypoints) {
+	// 	RCLCPP_INFO(_node.get_logger(), "Search waypoint: %f, %f, %f", double(waypoint.x()), double(waypoint.y()), double(waypoint.z()));
+	// }
 	_state = State::Search;
 }
 
@@ -230,36 +234,73 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 void PrecisionLand::generateSearchWaypoints()
 {
-	// Generate paralelltrack search wayponts
+	// // Generate paralelltrack search wayponts
+	// // The search waypoints are generated in the NED frame
+	// // Parameters for the search pattern
+	// double start_x = 0.0;
+	// double start_y = 0.0;
+	// double start_z = _vehicle_local_position->positionNed().z();
+	// double width = 5.0;
+	// double length = 15;
+	// double spacing = 3.0;
+	// bool reverse = false;
+	// std::vector<Eigen::Vector3f> waypoints;
+
+	// // Generate waypoints
+	// for (double i = 0; i <= length; i += spacing) {
+	// 	// Add waypoints in reverse order to make the drone fly in a zigzag pattern
+	// 	if (reverse) {
+	// 		waypoints.push_back(Eigen::Vector3f(start_x + i, start_y + width, start_z));
+	// 		waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y + width, start_z));
+
+	// 	} else {
+	// 		waypoints.push_back(Eigen::Vector3f(start_x + i, start_y, start_z));
+	// 		waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y, start_z));
+	// 	}
+
+	// 	reverse = !reverse;
+	// }
+
+	// // Reverse the waypoints to make the drone end the search at the starting point of the pattern
+	// std::reverse(waypoints.begin(), waypoints.end());
+	// _search_waypoints = waypoints;
+
+	// Generate spiral search waypoints
 	// The search waypoints are generated in the NED frame
 	// Parameters for the search pattern
 	double start_x = 0.0;
 	double start_y = 0.0;
-	double start_z = _vehicle_local_position->positionNed().z();
-	double width = 5.0;
-	double length = 15;
-	double spacing = 3.0;
-	bool reverse = false;
+	double current_z = _vehicle_local_position->positionNed().z();
+	double radius = abs(current_z/2);
+	double layer_spacing = abs(current_z/5);
+	int points_per_layer = 4;
 	std::vector<Eigen::Vector3f> waypoints;
+	RCLCPP_INFO(_node.get_logger(), "current_z: %f", double(current_z));
 
 	// Generate waypoints
-	for (double i = 0; i <= length; i += spacing) {
-		// Add waypoints in reverse order to make the drone fly in a zigzag pattern
-		if (reverse) {
-			waypoints.push_back(Eigen::Vector3f(start_x + i, start_y + width, start_z));
-			waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y + width, start_z));
+	while(current_z<-3.0)
 
-		} else {
-			waypoints.push_back(Eigen::Vector3f(start_x + i, start_y, start_z));
-			waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y, start_z));
-		}
+	{
+	for (int point = 0; point < points_per_layer; point++) {
+		double angle = 2.0 * M_PI * point / points_per_layer;
+		double x = start_x + radius * cos(angle);
+		double y = start_y + radius * sin(angle);
+		double z = current_z;
 
-		reverse = !reverse;
+		waypoints.push_back(Eigen::Vector3f(x, y, z));
+		
+	}
+	current_z+=layer_spacing; // Decrease the altitude for the next layer
+	radius = abs(current_z/2);;  // Decrease the radius for the next layer
 	}
 
 	// Reverse the waypoints to make the drone end the search at the starting point of the pattern
-	std::reverse(waypoints.begin(), waypoints.end());
+	// std::reverse(waypoints.begin(), waypoints.end());
 	_search_waypoints = waypoints;
+	// Print the search waypoints
+	for (auto& waypoint : _search_waypoints) {
+		RCLCPP_INFO(_node.get_logger(), "Search waypoint: %f, %f, %f", double(waypoint.x()), double(waypoint.y()), double(waypoint.z()));
+	}
 }
 
 bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
