@@ -236,9 +236,9 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		auto time_now = _node.now();
 
 		// Log the current time and the last target timestamp
-		auto elapsed = time_now - _last_target_timestamp;
+
 		// Check if the last target timestamp is older than 0.2 second and we are close to the ground
-		if (elapsed.seconds() > 0.2) {
+		if (((time_now - _last_target_timestamp).seconds() > 0.2) && distance_to_ground < 1.0) {
 			if (!_flag) {
 				RCLCPP_INFO(_node.get_logger(), "Current time:  %f seconds, %ld nanoseconds", time_now.seconds(), time_now.nanoseconds());
 				RCLCPP_INFO(_node.get_logger(), "Last target timestamp: %f seconds, %ld nanoseconds", _last_target_timestamp.seconds(), _last_target_timestamp.nanoseconds());
@@ -255,7 +255,6 @@ void PrecisionLand::updateSetpoint(float dt_s)
 			_trajectory_setpoint_msg.yawspeed = NAN;
 
 		} else {
-			_flag = false;
 			// Publisher for trajectory setpoint
 			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
 			_trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
