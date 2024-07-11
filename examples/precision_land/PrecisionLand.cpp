@@ -45,6 +45,8 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node, const std::string& topic_namesp
 void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
 
+	// Last Target timestamp
+	_last_target_timestamp = _node.now();
 
 	// Aruco pose in camera frame
 	geometry_msgs::msg::Pose aruco_pose;
@@ -103,7 +105,7 @@ void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::Sh
 	auto target_position = Eigen::Vector3f(pose_aruco_in_world.position.x, pose_aruco_in_world.position.y, pose_aruco_in_world.position.z);
 	_target_position = target_position;
 
-	_last_target_timestamp = msg->header.stamp;
+
 }
 
 void PrecisionLand::onActivate()
@@ -111,11 +113,8 @@ void PrecisionLand::onActivate()
 	generateSearchWaypoints();
 	// Initialize _target_position with NaN values
 	_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
+	// State transition to Search
 	RCLCPP_INFO(_node.get_logger(), "Switching to State::Search");
-	// Print the search waypoints
-	// for (auto& waypoint : _search_waypoints) {
-	// 	RCLCPP_INFO(_node.get_logger(), "Search waypoint: %f, %f, %f", double(waypoint.x()), double(waypoint.y()), double(waypoint.z()));
-	// }
 	_state = State::Search;
 }
 
@@ -133,7 +132,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// If the market has not been detected, search for it
 		if (std::isnan(_target_position.x())) {
-			// RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
+			// Get the next waypoint
 			Eigen::Vector3f target_position = _search_waypoints[_search_waypoint_index];
 			// Go to the next waypoint
 			// Publisher for trajectory setpoint
@@ -162,6 +161,8 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		// -- Check if the marker has been detected --> State Transition
 		else {
 			RCLCPP_INFO(_node.get_logger(), "Switching to State::Approach");
+			// Target posittion printed
+			RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
 			_state = State::Approach;
 		}
 
@@ -201,18 +202,69 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// TODO: while in failsafe (normal land) keep checking conditions to switch back into precision land
 
+		// // Version without timeout
+
+		// // Z target one meter below ground
+		// auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 10;
+		// auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), target_z);
+		// auto heading = _target_heading;
+
+		// _trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+		// _trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
+		// _trajectory_setpoint_msg.velocity = {NAN, NAN, 0.35};
+		// _trajectory_setpoint_msg.acceleration = {0.0, 0.0, NAN};
+		// _trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+		// _trajectory_setpoint_msg.yaw = heading;
+		// _trajectory_setpoint_msg.yawspeed = NAN;
+		// // Publish the trajectory setpoint
+		// _trajectory_setpoint->update(_trajectory_setpoint_msg);
+
+		// // -- Check std::absf(Position - Target < Threshold) --> State Transition
+		// if (_land_detected) {
+		// 	RCLCPP_INFO(_node.get_logger(), "Switching to State::Finished");
+		// 	_state = State::Finished;
+		// }
+
+		// break;
+
+		// Version with timeout
 		// Z target one meter below ground
-		auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 10;
+		auto distance_to_ground = _vehicle_local_position->distanceGround();
+		auto target_z = _vehicle_local_position->positionNed().z() + distance_to_ground + 10;
 		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), target_z);
 		auto heading = _target_heading;
+		auto time_now = _node.now();
 
-		_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
-		_trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
-		_trajectory_setpoint_msg.velocity = {NAN, NAN, 0.35};
-		_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
-		_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
-		_trajectory_setpoint_msg.yaw = heading;
-		_trajectory_setpoint_msg.yawspeed = NAN;
+		// Log the current time and the last target timestamp
+
+		// Check if the last target timestamp is older than 0.2 second and we are close to the ground
+		if (((time_now - _last_target_timestamp).seconds() > 0.2) && distance_to_ground < 1.0) {
+			if (!_flag) {
+				RCLCPP_INFO(_node.get_logger(), "Current time:  %f seconds, %ld nanoseconds", time_now.seconds(), time_now.nanoseconds());
+				RCLCPP_INFO(_node.get_logger(), "Last target timestamp: %f seconds, %ld nanoseconds", _last_target_timestamp.seconds(), _last_target_timestamp.nanoseconds());
+				RCLCPP_INFO(_node.get_logger(), "Lost target, descending to ground level");
+				_flag = true;
+			}
+
+			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+			_trajectory_setpoint_msg.position = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.velocity = {NAN, NAN, 0.7};
+			_trajectory_setpoint_msg.acceleration = {0.0, 0.0, NAN};
+			_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.yaw = heading;
+			_trajectory_setpoint_msg.yawspeed = NAN;
+
+		} else {
+			// Publisher for trajectory setpoint
+			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
+			_trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
+			_trajectory_setpoint_msg.velocity = {NAN, NAN, 0.35};
+			_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
+			_trajectory_setpoint_msg.yaw = heading;
+			_trajectory_setpoint_msg.yawspeed = NAN;
+		}
+
 		// Publish the trajectory setpoint
 		_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
@@ -234,73 +286,64 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 void PrecisionLand::generateSearchWaypoints()
 {
-	// // Generate paralelltrack search wayponts
-	// // The search waypoints are generated in the NED frame
-	// // Parameters for the search pattern
-	// double start_x = 0.0;
-	// double start_y = 0.0;
-	// double start_z = _vehicle_local_position->positionNed().z();
-	// double width = 5.0;
-	// double length = 15;
-	// double spacing = 3.0;
-	// bool reverse = false;
-	// std::vector<Eigen::Vector3f> waypoints;
-
-	// // Generate waypoints
-	// for (double i = 0; i <= length; i += spacing) {
-	// 	// Add waypoints in reverse order to make the drone fly in a zigzag pattern
-	// 	if (reverse) {
-	// 		waypoints.push_back(Eigen::Vector3f(start_x + i, start_y + width, start_z));
-	// 		waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y + width, start_z));
-
-	// 	} else {
-	// 		waypoints.push_back(Eigen::Vector3f(start_x + i, start_y, start_z));
-	// 		waypoints.push_back(Eigen::Vector3f(start_x + i + spacing, start_y, start_z));
-	// 	}
-
-	// 	reverse = !reverse;
-	// }
-
-	// // Reverse the waypoints to make the drone end the search at the starting point of the pattern
-	// std::reverse(waypoints.begin(), waypoints.end());
-	// _search_waypoints = waypoints;
-
 	// Generate spiral search waypoints
 	// The search waypoints are generated in the NED frame
 	// Parameters for the search pattern
 	double start_x = 0.0;
 	double start_y = 0.0;
 	double current_z = _vehicle_local_position->positionNed().z();
-	double radius = abs(current_z/2);
-	double layer_spacing = abs(current_z/5);
-	int points_per_layer = 4;
+	auto min_z = -1.5;
+
+	double max_radius = 2.0;
+	double layer_spacing = 1.0;
+	int points_per_layer = 16;
 	std::vector<Eigen::Vector3f> waypoints;
 	RCLCPP_INFO(_node.get_logger(), "current_z: %f", double(current_z));
 
 	// Generate waypoints
-	while(current_z<-3.0)
+	// Calculate the number of layers needed
+	int num_layers = (static_cast<int>((min_z - current_z) / layer_spacing)) / 2;
 
-	{
-	for (int point = 0; point < points_per_layer; point++) {
-		double angle = 2.0 * M_PI * point / points_per_layer;
-		double x = start_x + radius * cos(angle);
-		double y = start_y + radius * sin(angle);
-		double z = current_z;
+	// Generate waypoints
+	for (int layer = 0; layer < num_layers; ++layer) {
+		std::vector<Eigen::Vector3f> layer_waypoints;
 
-		waypoints.push_back(Eigen::Vector3f(x, y, z));
-		
+		// Spiral out to max radius
+		double radius = 0.0;
+
+		for (int point = 0; point < points_per_layer + 1; ++point) {
+			double angle = 2.0 * M_PI * point / points_per_layer;
+			double x = start_x + radius * cos(angle);
+			double y = start_y + radius * sin(angle);
+			double z = current_z;
+
+			layer_waypoints.push_back(Eigen::Vector3f(x, y, z));
+			radius += max_radius / points_per_layer;
+		}
+
+		// Push the spiral out waypoints to the main waypoints vector
+		waypoints.insert(waypoints.end(), layer_waypoints.begin(), layer_waypoints.end());
+
+		// Decrease the altitude for the inward spiral
+		current_z += layer_spacing;
+
+		// Reverse the layer waypoints for spiral in
+		std::reverse(layer_waypoints.begin(), layer_waypoints.end());
+
+		// Adjust the z-coordinate for the inward spiral
+		for (auto& waypoint : layer_waypoints) {
+			waypoint.z() = current_z;
+		}
+
+		// Push the reversed waypoints to the main waypoints vector
+		waypoints.insert(waypoints.end(), layer_waypoints.begin(), layer_waypoints.end());
+
+		// Decrease the altitude for the next outward spiral
+		current_z += layer_spacing;
 	}
-	current_z+=layer_spacing; // Decrease the altitude for the next layer
-	radius = abs(current_z/2);;  // Decrease the radius for the next layer
-	}
 
-	// Reverse the waypoints to make the drone end the search at the starting point of the pattern
-	// std::reverse(waypoints.begin(), waypoints.end());
+	// Set the search waypoints
 	_search_waypoints = waypoints;
-	// Print the search waypoints
-	for (auto& waypoint : _search_waypoints) {
-		RCLCPP_INFO(_node.get_logger(), "Search waypoint: %f, %f, %f", double(waypoint.x()), double(waypoint.y()), double(waypoint.z()));
-	}
 }
 
 bool PrecisionLand::positionReached(const Eigen::Vector3f& target) const
