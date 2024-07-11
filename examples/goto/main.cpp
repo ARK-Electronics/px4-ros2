@@ -18,7 +18,7 @@ using namespace px4_ros2::literals;
 class FlightModeTest : public px4_ros2::ModeBase
 {
 public:
-	explicit FlightModeTest(rclcpp::Node& node)
+	explicit FlightModeTest(rclcpp::Node& node, const std::string& topic_namespace_prefix = "")
 		: ModeBase(node, kName)
 	{
 		_goto_setpoint = std::make_shared<px4_ros2::GotoSetpointType>(*this);
