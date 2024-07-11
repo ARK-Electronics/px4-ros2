@@ -125,6 +125,19 @@ void PrecisionLand::onDeactivate()
 
 void PrecisionLand::updateSetpoint(float dt_s)
 {
+	// Checking target lost
+	auto elapsed = (_node.now().nanoseconds() - _last_target_timestamp.nanoseconds())/1e9;
+	// Based on the state, set the target lost flag
+	if (_state == State::Approach && elapsed > 0.2) {
+		RCLCPP_INFO(_node.get_logger(), "Target lost during approach");
+		_target_lost = true;
+	} else if (_state == State::Descend && elapsed > 0.5) {
+		RCLCPP_INFO(_node.get_logger(), "Target lost during descend");
+		_target_lost = true;
+	} else {
+		_target_lost = false;
+	}
+
 	switch (_state) {
 	case State::Search: {
 
@@ -170,6 +183,12 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	}
 
 	case State::Approach: {
+		// If target has been lost, switch to search
+		if (_target_lost) {
+			RCLCPP_INFO(_node.get_logger(), "Switching back to State::Search");
+			_state = State::Search;
+			break;
+		}
 		// Aproach the target position
 		_approach_altitude = _vehicle_local_position->positionNed().z();
 
@@ -182,6 +201,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
 		_trajectory_setpoint_msg.yaw = _target_heading;
 		_trajectory_setpoint_msg.yawspeed = NAN;
+
 		// Publish the trajectory setpoint
 		_trajectory_setpoint->update(_trajectory_setpoint_msg);
 
@@ -202,33 +222,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// TODO: while in failsafe (normal land) keep checking conditions to switch back into precision land
 
-		// // Version without timeout
 
-		// // Z target one meter below ground
-		// auto target_z = _vehicle_local_position->positionNed().z() + _vehicle_local_position->distanceGround() + 10;
-		// auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), target_z);
-		// auto heading = _target_heading;
-
-		// _trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
-		// _trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};
-		// _trajectory_setpoint_msg.velocity = {NAN, NAN, 0.35};
-		// _trajectory_setpoint_msg.acceleration = {0.0, 0.0, NAN};
-		// _trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
-		// _trajectory_setpoint_msg.yaw = heading;
-		// _trajectory_setpoint_msg.yawspeed = NAN;
-		// // Publish the trajectory setpoint
-		// _trajectory_setpoint->update(_trajectory_setpoint_msg);
-
-		// // -- Check std::absf(Position - Target < Threshold) --> State Transition
-		// if (_land_detected) {
-		// 	RCLCPP_INFO(_node.get_logger(), "Switching to State::Finished");
-		// 	_state = State::Finished;
-		// }
-
-		// break;
-
-		// Version with timeout
-		// Z target one meter below ground
 		auto distance_to_ground = _vehicle_local_position->distanceGround();
 		auto target_z = _vehicle_local_position->positionNed().z() + distance_to_ground + 10;
 		auto position = Eigen::Vector3f(_target_position.x(), _target_position.y(), target_z);
@@ -238,24 +232,20 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		// Log the current time and the last target timestamp
 		auto elapsed = time_now - _last_target_timestamp;
 		// Check if the last target timestamp is older than 0.2 second and we are close to the ground
-		if (elapsed.seconds() > 0.2) {
-			if (!_flag) {
-				RCLCPP_INFO(_node.get_logger(), "Current time:  %f seconds, %ld nanoseconds", time_now.seconds(), time_now.nanoseconds());
-				RCLCPP_INFO(_node.get_logger(), "Last target timestamp: %f seconds, %ld nanoseconds", _last_target_timestamp.seconds(), _last_target_timestamp.nanoseconds());
-				RCLCPP_INFO(_node.get_logger(), "Lost target, descending to ground level");
-				_flag = true;
-			}
-
+		if (_target_lost || distance_to_ground < 0.2) {
+			// If the target is lost or we are close to the ground go straight down
 			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
 			_trajectory_setpoint_msg.position = {NAN, NAN, NAN};
-			_trajectory_setpoint_msg.velocity = {NAN, NAN, 0.7};
+			_trajectory_setpoint_msg.velocity = {0.0, 0.0, 0.4};
 			_trajectory_setpoint_msg.acceleration = {0.0, 0.0, NAN};
 			_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
 			_trajectory_setpoint_msg.yaw = heading;
 			_trajectory_setpoint_msg.yawspeed = NAN;
-
-		} else {
-			_flag = false;
+			
+	
+		}
+		else {
+			// If the target is not lost and we are not close to the ground, descend to the target position
 			// Publisher for trajectory setpoint
 			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
 			_trajectory_setpoint_msg.position = {position.x(), position.y(), NAN};

@@ -75,7 +75,7 @@ private:
 	int _search_waypoint_index = 0;
 	// Land detection
 	bool _land_detected = false;
-	bool _flag = false;
+	bool _target_lost = false;
 
 
 };
