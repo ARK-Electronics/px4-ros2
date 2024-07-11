@@ -18,7 +18,7 @@ static const std::string kName = "Custom RTL";
 class FlightModeTest : public px4_ros2::ModeBase
 {
 public:
-	explicit FlightModeTest(rclcpp::Node& node)
+	explicit FlightModeTest(rclcpp::Node& node, const std::string& topic_namespace_prefix = "")
 		: ModeBase(node, Settings{kName, true, ModeBase::kModeIDRtl})
 	{
 		_vehicle_land_detected_sub = node.create_subscription<px4_msgs::msg::VehicleLandDetected>(

@@ -17,7 +17,7 @@ static const std::string kName = "Autonomous Executor";
 class FlightModeTest : public px4_ros2::ModeBase
 {
 public:
-	explicit FlightModeTest(rclcpp::Node& node)
+	explicit FlightModeTest(rclcpp::Node& node, const std::string& topic_namespace_prefix = "")
 		: ModeBase(node, Settings{kName, false})
 	{
 		_trajectory_setpoint = std::make_shared<px4_ros2::TrajectorySetpointType>(*this);
