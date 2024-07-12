@@ -128,10 +128,10 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	// Checking target lost
 	auto elapsed = (_node.now().nanoseconds() - _last_target_timestamp.nanoseconds())/1e9;
 	// Based on the state, set the target lost flag
-	if (_state == State::Approach && elapsed > 0.2) {
+	if (_state == State::Approach && elapsed > 1.0) {
 		RCLCPP_INFO(_node.get_logger(), "Target lost during approach");
 		_target_lost = true;
-	} else if (_state == State::Descend && elapsed > 0.5) {
+	} else if (_state == State::Descend && elapsed > 0.4) {
 		RCLCPP_INFO(_node.get_logger(), "Target lost during descend");
 		_target_lost = true;
 	} else {
@@ -175,7 +175,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		else {
 			RCLCPP_INFO(_node.get_logger(), "Switching to State::Approach");
 			// Target posittion printed
-			RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
+			// RCLCPP_INFO(_node.get_logger(), "Target position: %f, %f, %f", double(_target_position.x()), double(_target_position.y()), double(_target_position.z()));
 			_state = State::Approach;
 		}
 
@@ -186,6 +186,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		// If target has been lost, switch to search
 		if (_target_lost) {
 			RCLCPP_INFO(_node.get_logger(), "Switching back to State::Search");
+			_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
 			_state = State::Search;
 			break;
 		}
@@ -232,7 +233,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		// Log the current time and the last target timestamp
 		auto elapsed = time_now - _last_target_timestamp;
 		// Check if the last target timestamp is older than 0.2 second and we are close to the ground
-		if (_target_lost || distance_to_ground < 0.2) {
+		if (_target_lost || distance_to_ground < 0.3) {
 			// If the target is lost or we are close to the ground go straight down
 			_trajectory_setpoint_msg.timestamp = _node.now().nanoseconds() / 1000;
 			_trajectory_setpoint_msg.position = {NAN, NAN, NAN};
