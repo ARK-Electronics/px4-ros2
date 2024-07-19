@@ -26,7 +26,7 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	_vehicle_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
 
 	// Subscribe to VehicleAttitude
-	_vehicle_attitude= std::make_shared<px4_ros2::OdometryAttitude>(*this);
+	_vehicle_attitude = std::make_shared<px4_ros2::OdometryAttitude>(*this);
 
 	// Subscribe to target_pose
 	_target_pose_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>("/target_pose",
@@ -43,15 +43,15 @@ void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::Sh
 
 	(void)vehicle_q;
 
-    // Fetch vehicle's current heading (yaw)
-    float vehicle_heading = _vehicle_local_position->heading();  // Placeholder for your method to get the heading
+	// Fetch vehicle's current heading (yaw)
+	float vehicle_heading = _vehicle_local_position->heading();  // Placeholder for your method to get the heading
 
 	// TODO: rotate the XYZ into world frame
-    Eigen::Matrix3f rotation_matrix;
-    rotation_matrix = Eigen::AngleAxisf(vehicle_heading, Eigen::Vector3f::UnitZ());
+	Eigen::Matrix3f rotation_matrix;
+	rotation_matrix = Eigen::AngleAxisf(vehicle_heading, Eigen::Vector3f::UnitZ());
 
-    auto target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-    _target_position = rotation_matrix * target_position;
+	auto target_position = Eigen::Vector3f(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+	_target_position = rotation_matrix * target_position;
 }
 
 void PrecisionLand::onActivate()
@@ -100,6 +100,7 @@ void PrecisionLand::updateSetpoint(float dt_s)
 			_approach_altitude = _vehicle_local_position->positionNed().z();
 			_state = State::Approach;
 		}
+
 		break;
 	}
 
