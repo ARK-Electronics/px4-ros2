@@ -36,12 +36,10 @@ public:
   CameraNode();
 
 private:
-  void timer_callback();
   sensor_msgs::msg::CameraInfo create_camera_info_msg();
   static GstFlowReturn new_sample(GstAppSink *sink, gpointer data);
 
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr _image_publisher;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr _camera_info_publisher;
-  rclcpp::TimerBase::SharedPtr _timer;
   GstElement *_pipeline, *_appsink;
 };

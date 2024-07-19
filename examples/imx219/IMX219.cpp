@@ -84,11 +84,6 @@ CameraNode::CameraNode() : Node("camera_node") {
   _image_publisher = this->create_publisher<sensor_msgs::msg::Image>("camera/image", qos_profile);
   _camera_info_publisher = this->create_publisher<sensor_msgs::msg::CameraInfo>("camera/camera_info", qos_profile);
 
-  // Timer interval is set to capture frames at approximately 30 fps
-  _timer = this->create_wall_timer(
-    std::chrono::milliseconds(33), // Approximately 30 fps (1000 ms / 30 fps = 33.33 ms)
-    std::bind(&CameraNode::timer_callback, this));
-
   // Initialize GStreamer
   gst_init(nullptr, nullptr);
 
@@ -136,9 +131,6 @@ sensor_msgs::msg::CameraInfo CameraNode::create_camera_info_msg() {
   return camera_info_msg;
 }
 
-void CameraNode::timer_callback() {
-  // The actual frame grabbing and publishing is done in the new_sample callback
-}
 
 GstFlowReturn CameraNode::new_sample(GstAppSink *sink, gpointer data) {
   CameraNode *node = static_cast<CameraNode*>(data);
