@@ -66,7 +66,7 @@ void PrecisionLand::targetPoseCallback(const geometry_msgs::msg::PoseStamped::Sh
 	1, 0, 0,
 	0, 0, 1;
 	Eigen::Quaternionf quat(R);
-	camera_pose.position.x = 0;// camera case and camera position
+	camera_pose.position.x = 0.12;// camera case and camera position 0.12
 	camera_pose.position.y = 0;// camera case and camera position
 	camera_pose.position.z = 0;// camera case and camera position
 	camera_pose.orientation.w = quat.w();
@@ -128,10 +128,10 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	// Checking target lost
 	auto elapsed = (_node.now().nanoseconds() - _last_target_timestamp.nanoseconds())/1e9;
 	// Based on the state, set the target lost flag
-	if (_state == State::Approach && elapsed > 1.0) {
+	if (_state == State::Approach && elapsed > 2.0) {
 		RCLCPP_INFO(_node.get_logger(), "Target lost during approach");
 		_target_lost = true;
-	} else if (_state == State::Descend && elapsed > 0.4) {
+	} else if (_state == State::Descend && elapsed > 0.5) {
 		RCLCPP_INFO(_node.get_logger(), "Target lost during descend");
 		_target_lost = true;
 	} else {
@@ -183,13 +183,6 @@ void PrecisionLand::updateSetpoint(float dt_s)
 	}
 
 	case State::Approach: {
-		// If target has been lost, switch to search
-		if (_target_lost) {
-			RCLCPP_INFO(_node.get_logger(), "Switching back to State::Search");
-			_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
-			_state = State::Search;
-			break;
-		}
 		// Aproach the target position
 		_approach_altitude = _vehicle_local_position->positionNed().z();
 
@@ -200,8 +193,21 @@ void PrecisionLand::updateSetpoint(float dt_s)
 		_trajectory_setpoint_msg.velocity = {NAN, NAN, NAN};
 		_trajectory_setpoint_msg.acceleration = {NAN, NAN, NAN};
 		_trajectory_setpoint_msg.jerk = {NAN, NAN, NAN};
-		_trajectory_setpoint_msg.yaw = _target_heading;
-		_trajectory_setpoint_msg.yawspeed = NAN;
+		// _trajectory_setpoint_msg.yaw = _target_heading;
+		// _trajectory_setpoint_msg.yawspeed = NAN;
+		// Calculate yawspeed for smooth heading adjustment
+		float current_heading = _vehicle_local_position->heading();
+		float heading_difference = _target_heading - current_heading;
+		float max_yawspeed = 0.1; // Maximum yawspeed (rad/s), adjust for desired smoothness
+
+		// Normalize the heading difference to be within [-pi, pi]
+		heading_difference = atan2(sin(heading_difference), cos(heading_difference));
+
+		// Calculate yawspeed to gradually reduce the heading difference
+		float yawspeed = std::clamp(heading_difference, -max_yawspeed, max_yawspeed);
+
+		_trajectory_setpoint_msg.yaw = NAN; // Set yaw to NAN to use yawspeed control
+		_trajectory_setpoint_msg.yawspeed = yawspeed;
 
 		// Publish the trajectory setpoint
 		_trajectory_setpoint->update(_trajectory_setpoint_msg);
@@ -209,8 +215,18 @@ void PrecisionLand::updateSetpoint(float dt_s)
 
 		// -- Check std::absf(Position - Target < Threshold) --> State Transition
 		if (positionReached(position)) {
-			RCLCPP_INFO(_node.get_logger(), "Switching to State::Descend");
-			_state = State::Descend;
+			// If target has been lost, switch to search
+			if (_target_lost) {
+				RCLCPP_INFO(_node.get_logger(), "Switching back to State::Search");
+				_target_position.setConstant(std::numeric_limits<float>::quiet_NaN());
+				_state = State::Search;
+				break;
+			}
+			else {
+				// If target is still detected, switch to descend
+				RCLCPP_INFO(_node.get_logger(), "Switching to State::Descend");
+				_state = State::Descend;
+			}
 		}
 
 		break;
@@ -284,17 +300,18 @@ void PrecisionLand::generateSearchWaypoints()
 	double start_x = 0.0;
 	double start_y = 0.0;
 	double current_z = _vehicle_local_position->positionNed().z();
-	auto min_z = -1.5;
+	auto min_z = -1.0;
 
 	double max_radius = 2.0;
-	double layer_spacing = 1.0;
+	double layer_spacing = 0.5;
 	int points_per_layer = 16;
 	std::vector<Eigen::Vector3f> waypoints;
 	RCLCPP_INFO(_node.get_logger(), "current_z: %f", double(current_z));
 
 	// Generate waypoints
 	// Calculate the number of layers needed
-	int num_layers = (static_cast<int>((min_z - current_z) / layer_spacing)) / 2;
+	int num_layers = (static_cast<int>((min_z - current_z) / layer_spacing) / 2) < 1 ? 1 : (static_cast<int>((min_z - current_z) / layer_spacing) / 2);
+
 
 	// Generate waypoints
 	for (int layer = 0; layer < num_layers; ++layer) {
